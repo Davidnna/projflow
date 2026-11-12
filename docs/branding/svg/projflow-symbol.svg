@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">ProjFlow symbol</title>
+  <desc id="desc">A document with an upward teal path and blue progress bars, representing project documentation and progress.</desc>
+  <g id="projflow-mark">
+      <path d="M34 19 H94 L119 44 V133 H34 Z" fill="#FFFFFF" stroke="#101C36" stroke-width="9" stroke-linejoin="round"/>
+      <path d="M94 19 V44 H119 Z" fill="#2563EB" stroke="#2563EB" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M50 60 H81 M50 78 H88 M50 96 H75" fill="none" stroke="#101C36" stroke-width="7" stroke-linecap="round"/>
+      <rect x="60" y="116" width="13" height="17" rx="2" fill="#2563EB"/>
+      <rect x="80" y="106" width="13" height="27" rx="2" fill="#2563EB"/>
+      <rect x="100" y="92" width="13" height="41" rx="2" fill="#2563EB"/>
+      <path d="M19 132 C43 128 62 118 79 101 C94 86 108 76 129 66" fill="none" stroke="#14B8A6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M122 53 L145 60 L129 80 Z" fill="#14B8A6"/>
+    </g>
+</svg>

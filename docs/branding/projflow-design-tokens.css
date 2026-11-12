@@ -1,0 +1,25 @@
+/* ProjFlow design tokens — Brand Identity v1.0 */
+:root {
+  --pf-navy: #101C36;
+  --pf-blue: #2563EB;
+  --pf-teal: #14B8A6;
+  --pf-light: #F1F5F9;
+  --pf-white: #FFFFFF;
+  --pf-ink: #0B1220;
+
+  --pf-primary: var(--pf-blue);
+  --pf-navigation: var(--pf-navy);
+  --pf-success: var(--pf-teal);
+  --pf-surface: var(--pf-white);
+  --pf-background: var(--pf-light);
+  --pf-text: var(--pf-ink);
+
+  --pf-font-brand: "Montserrat", Arial, sans-serif;
+  --pf-font-ui: "Inter", Arial, sans-serif;
+
+  --pf-radius-sm: 0.375rem;
+  --pf-radius-md: 0.75rem;
+  --pf-radius-lg: 1rem;
+
+  --pf-shadow-card: 0 8px 24px rgba(16, 28, 54, 0.08);
+}

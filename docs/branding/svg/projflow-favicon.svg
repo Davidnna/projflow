@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ProjFlow favicon</title>
+  <desc id="desc">Simplified ProjFlow document and progress icon.</desc>
+  
+  <rect width="512" height="512" rx="112" fill="#101C36"/>
+  <path d="M130 92 H294 L362 160 V390 H130 Z" fill="none" stroke="#FFFFFF" stroke-width="30" stroke-linejoin="round"/>
+  <path d="M294 92 V160 H362 Z" fill="#2563EB"/>
+  <path d="M166 198 H252 M166 242 H268" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+  <rect x="190" y="318" width="34" height="72" rx="6" fill="#2563EB"/>
+  <rect x="244" y="286" width="34" height="104" rx="6" fill="#2563EB"/>
+  <path d="M98 366 C180 350 240 300 330 230" fill="none" stroke="#14B8A6" stroke-width="26" stroke-linecap="round"/>
+  <path d="M308 202 L384 194 L354 266 Z" fill="#14B8A6"/>
+
+</svg>

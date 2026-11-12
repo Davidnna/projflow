@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="440" viewBox="0 0 1000 220" role="img" aria-labelledby="title desc">
+  <title id="title">ProjFlow reversed logo</title>
+  <desc id="desc">ProjFlow logo for dark backgrounds.</desc>
+  
+  <rect x="0" y="0" width="1000" height="220" rx="22" fill="#101C36"/>
+  <g transform="translate(18 28) scale(1.15)"><g id="projflow-mark">
+      <path d="M34 19 H94 L119 44 V133 H34 Z" fill="#101C36" stroke="#FFFFFF" stroke-width="9" stroke-linejoin="round"/>
+      <path d="M94 19 V44 H119 Z" fill="#2563EB" stroke="#2563EB" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M50 60 H81 M50 78 H88 M50 96 H75" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round"/>
+      <rect x="60" y="116" width="13" height="17" rx="2" fill="#2563EB"/>
+      <rect x="80" y="106" width="13" height="27" rx="2" fill="#2563EB"/>
+      <rect x="100" y="92" width="13" height="41" rx="2" fill="#2563EB"/>
+      <path d="M19 132 C43 128 62 118 79 101 C94 86 108 76 129 66" fill="none" stroke="#14B8A6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M122 53 L145 60 L129 80 Z" fill="#14B8A6"/>
+    </g></g>
+  <text x="226" y="119" font-family="Montserrat, Arial, sans-serif" font-size="88" font-weight="700" letter-spacing="-3">
+    <tspan fill="#FFFFFF">Proj</tspan><tspan fill="#2563EB">Flow</tspan>
+  </text>
+  <text x="232" y="166" font-family="Inter, Arial, sans-serif" font-size="27" font-weight="600" fill="#FFFFFF" letter-spacing="0.1">
+    From Proposal to Final Defence.
+  </text>
+
+</svg>
