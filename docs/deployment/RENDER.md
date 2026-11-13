@@ -2,7 +2,7 @@
 
 The root `render.yaml` defines the Django service.
 
-- Runtime: Python 3.13.11 (`backend/.python-version`)
+- Runtime: Python 3.13.18 (`backend/.python-version`)
 - Root directory: `backend`
 - Build: install dependencies, run Django checks and collect static files
 - Start: apply migrations and start Gunicorn
