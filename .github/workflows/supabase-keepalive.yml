@@ -1,0 +1,53 @@
+name: Supabase Activity Keep-alive
+
+on:
+  schedule:
+    # Two daily database checks, deliberately away from the top of the hour.
+    - cron: "23 6,18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-database-active:
+    name: Query database through ProjFlow API
+    if: ${{ vars.PROJFLOW_READINESS_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check database readiness
+        env:
+          READINESS_URL: ${{ vars.PROJFLOW_READINESS_URL }}
+        run: |
+          set -euo pipefail
+
+          echo "Calling the ProjFlow database readiness endpoint."
+
+          response="$(
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --retry 2 \
+              --retry-all-errors \
+              --retry-delay 15 \
+              --connect-timeout 20 \
+              --max-time 150 \
+              "$READINESS_URL"
+          )"
+
+          printf '%s\n' "$response"
+
+          python -c '
+          import json
+          import sys
+
+          payload = json.load(sys.stdin)
+          if payload.get("status") != "ready":
+              raise SystemExit(f"API is not ready: {payload}")
+          if payload.get("database") != "connected":
+              raise SystemExit(f"Database is not connected: {payload}")
+          print("ProjFlow API and database are ready.")
+          ' <<< "$response"
