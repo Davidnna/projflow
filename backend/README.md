@@ -1,7 +1,19 @@
-# Backend
+# ProjFlow Backend
 
-The backend will use Django and Django REST Framework with PostgreSQL.
+Django 5.2 LTS and Django REST Framework API.
 
-The custom user model must be designed and configured before the first database migration. Backend implementation will begin only after the database model and permission design are finalised.
+- Custom user model: `apps.accounts.User`
+- Authentication identifier: email address
+- Primary keys: UUID
+- Global roles: Administrator, Project Coordinator, Lecturer and Student
+- Production database: Supabase PostgreSQL
+- SQLite is used only as a local/test fallback when `DATABASE_URL` is absent.
 
-No application code or credentials are included in this initial repository foundation.
+## Public endpoints
+- `GET /api/health/` — process health check
+- `GET /api/ready/` — database readiness check
+
+All other DRF endpoints require authentication by default.
+
+## Deployment
+Render reads the root-level `render.yaml`. Production secrets and database credentials must be configured in Render environment settings. The Render start command applies migrations before starting Gunicorn. This is suitable for the initial free-tier foundation; use a dedicated pre-deploy migration step if the service moves to a plan that supports Render pre-deploy commands.

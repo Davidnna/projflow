@@ -1,5 +1,14 @@
-# Frontend
+# ProjFlow Frontend
 
-The frontend will use React, Vite, and React Router.
+React 19, Vite and React Router 7.
 
-The frontend will consume the Django REST API. Route guards and hidden UI controls are usability features only; all access control must also be enforced by the backend.
+## Cloudflare Pages configuration
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Production branch: `main`
+- Environment variable: `VITE_API_BASE_URL`, set to the deployed Render API origin without a trailing slash.
+
+The `public/_redirects` file provides SPA route fallback for React Router paths.
+
+The initial interface is a branded release foundation. It does not yet provide student registration, login or academic workflow functionality.

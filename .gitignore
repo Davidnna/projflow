@@ -1,7 +1,8 @@
-# Environment and secrets
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
+!.env.*.example
 *.pem
 *.key
 secrets/
@@ -29,7 +30,7 @@ build/
 dist/
 *.egg-info/
 
-# Django runtime and uploaded data
+# Django runtime data
 db.sqlite3
 db.sqlite3-journal
 media/
@@ -40,14 +41,14 @@ logs/
 
 # Node / React / Vite
 node_modules/
-dist/
+frontend/dist/
 .vite/
 coverage/
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Local configuration and editor files
+# Editors and operating systems
 .DS_Store
 Thumbs.db
 .idea/
@@ -56,7 +57,7 @@ Thumbs.db
 *.swp
 *.swo
 
-# Test and temporary files
+# Temporary files
 *.tmp
 *.bak
 .cache/

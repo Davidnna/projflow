@@ -2,78 +2,90 @@
 
 **From Proposal to Final Defence.**
 
-ProjFlow is a web-based final-year project management system designed to coordinate the administration, supervision, submission, examination, assessment, and publication of final-year undergraduate projects within a single academic department.
+ProjFlow is a web-based final-year project management system intended to coordinate student projects, supervision, submissions, examinations, assessments and result publication within one academic department.
 
-## Project status
+## Release
+- **Release:** `0.1.0`
+- **Purpose:** First deployable application foundation
+- **Status:** Initial deployment; academic workflows are not yet implemented
+- **Repository:** https://github.com/Davidnna/projflow
 
-**Stage:** Initial repository foundation  
-**Version:** 0.1.0-pre-development
+## Architecture
+- **Frontend:** React, Vite and React Router
+- **Backend:** Django and Django REST Framework
+- **Database:** Supabase PostgreSQL
+- **Frontend hosting:** Cloudflare Pages
+- **Backend hosting:** Render
+- **Source control:** GitHub
 
-The repository is being established before application implementation. Requirements and system design are being finalised so that implementation follows an agreed baseline.
-
-## Approved technology direction
-
-- **Frontend:** React, Vite, React Router
-- **Backend:** Python, Django, Django REST Framework
-- **Database:** PostgreSQL
-- **API style:** REST
-- **Architecture:** Modular monolith
-
-Exact dependency versions and deployment configuration will be established during implementation.
-
-## Initial scope
-
-The system is intended to support:
-
-- Departmental student registration and registration-number verification
-- Lecturer records and flexible departmental responsibilities
-- Supervisor allocation and topic approval
-- Project chapter and complete-document submissions
-- Supervision reviews, feedback, and version history
-- Configurable final submission deadline and audited exceptional reopening
-- Examination groups, panels, panel membership, and scheduling
-- Individual examiner assessments and panel-agreed criterion scores
-- Configurable assessment and grading schemes
-- Controlled result review, publication, and correction
-
-The system is scoped to one department for the initial implementation. Features outside the approved project-management scope will not be added without an explicit decision.
+The application is a modular monolith: one Django backend with clearly separated application modules and one React frontend.
 
 ## Repository structure
-
 ```text
 projflow/
-├── backend/                 # Django backend (implementation to follow)
-├── frontend/                # React frontend (implementation to follow)
-├── docs/
-│   ├── architecture/
-│   ├── database/
-│   ├── requirements/
-│   └── branding/
-├── .gitignore
+├── backend/
+│   ├── apps/accounts/
+│   ├── apps/core/
+│   ├── config/
+│   ├── manage.py
+│   └── requirements.txt
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   └── package.json
+├── docs/deployment/
+├── .github/workflows/
+├── render.yaml
 └── README.md
 ```
 
-## Development principles
+## First deployment
+Read [`docs/deployment/DEPLOYMENT-GUIDE.md`](docs/deployment/DEPLOYMENT-GUIDE.md) for the ordered setup of Supabase, Render and Cloudflare Pages.
 
-1. Enforce authorisation on the backend; frontend route guards are not security boundaries.
-2. Keep student records, project documents, assessment records, credentials, and backups private.
-3. Never commit `.env` files, secrets, real student data, or uploaded academic documents.
-4. Use synthetic data for demonstrations and tests.
-5. Preserve audit histories for sensitive academic and administrative operations.
-6. Implement and test modules incrementally.
+### Cloudflare Pages
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Build output directory: `dist`
+- Production branch: `main`
+- Environment variable: `VITE_API_BASE_URL`, set to the deployed Render API origin without a trailing slash.
 
-## Branding
+### Render
+The root-level `render.yaml` defines the Django web service. Create a Render Blueprint from this repository and provide the environment variables requested by Render.
 
-The approved initial identity is documented in [`docs/branding/BRAND-GUIDELINES.md`](docs/branding/BRAND-GUIDELINES.md).
+### Supabase
+Use the Supabase **Session pooler** connection string for the Render-hosted Django service. Copy the connection string from the Supabase dashboard; do not construct the pooler hostname or username manually.
 
-The primary logo, reversed logo, monochrome logo, symbol, app icon, favicon exports, and CSS design tokens are included in `docs/branding/`.
+## Current functionality
+This release provides:
+- Branded ProjFlow React application.
+- React Router navigation.
+- Django REST API health endpoint.
+- Database readiness endpoint.
+- Custom UUID-based Django user model.
+- Email-based account identifier.
+- Four seeded system roles: Administrator, Project Coordinator, Lecturer and Student.
+- Role assignments that allow multiple global roles per account.
+- Django administration foundation.
+- Automated backend tests and frontend production-build checks.
 
-## Security and privacy
+Student, supervision, submission, examination, assessment and result workflows are not yet implemented. The interface identifies these as upcoming modules and does not present them as working features.
 
-This is a public source-code repository. Public visibility does not make application data public. Production data and uploaded documents must be stored in appropriately protected services and must never be committed to this repository.
+## Development and deployment principles
+1. All application code is maintained in GitHub.
+2. GitHub Actions runs backend tests and a frontend production build.
+3. Render is configured to deploy after linked GitHub checks pass.
+4. Cloudflare Pages builds the React application from the `frontend` directory.
+5. Production secrets and database credentials are stored in hosting-provider environment variables, never in Git.
+6. Real student records, project documents and examination information must never be committed to this public repository.
+7. Uploaded academic documents will use private object storage when the submission module is implemented; they must not be stored on Render's ephemeral filesystem.
 
-Do not add API keys, database passwords, Django secret keys, personal data, or real academic records to Git history.
+## Security notes
+- `DEBUG` is disabled by default.
+- The Django secret key is generated by Render.
+- The health endpoint is public and contains no sensitive information.
+- The readiness endpoint reports database availability without returning connection details.
+- The API requires authentication by default, except for explicitly public health endpoints.
+- The initial release does not yet expose account registration or login endpoints.
 
 ## Licence
-
-No open-source licence has been selected yet. Until a licence is added, do not assume that the code may be reused, redistributed, or incorporated into other projects.
+No open-source licence has been selected. Until one is added, no permission to reuse or redistribute the software should be assumed.
