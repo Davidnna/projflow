@@ -1,0 +1,492 @@
+from io import BytesIO
+
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import status
+from rest_framework.test import APITestCase
+from openpyxl import Workbook
+
+from apps.accounts.models import Role, RoleCode, UserRole
+
+from .models import (
+    AcademicSession,
+    AcademicSessionStatus,
+    LecturerProfile,
+    RosterRecordSource,
+    StudentEnrollment,
+    StudentRosterRecord,
+    StudentVerificationStatus,
+    SupervisorAssignment,
+)
+from .services import activate_academic_session
+
+User = get_user_model()
+
+
+class AcademicTestDataMixin:
+    def create_user_with_role(self, email, role_code, password="Strong-test-password-123"):
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            first_name="Test",
+            last_name="User",
+        )
+        role = Role.objects.get(code=role_code)
+        UserRole.objects.create(user=user, role=role)
+        return user
+
+    def create_active_session(self, actor=None, name="2026/2027"):
+        session = AcademicSession.objects.create(
+            name=name,
+            start_date="2026-09-01",
+            end_date="2027-07-31",
+            created_by=actor,
+        )
+        if actor:
+            activate_academic_session(session.pk, actor)
+            session.refresh_from_db()
+        else:
+            session.status = AcademicSessionStatus.ACTIVE
+            session.save(update_fields=["status"])
+        return session
+
+
+class AcademicSessionAPITests(AcademicTestDataMixin, APITestCase):
+    def setUp(self):
+        self.coordinator = self.create_user_with_role(
+            "coordinator@example.com",
+            RoleCode.PROJECT_COORDINATOR,
+        )
+        self.client.force_authenticate(self.coordinator)
+
+    def test_coordinator_creates_and_activates_session(self):
+        response = self.client.post(
+            "/api/academics/sessions/",
+            {
+                "name": "2026/2027",
+                "start_date": "2026-09-01",
+                "end_date": "2027-07-31",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["status"], AcademicSessionStatus.PLANNED)
+
+        activation = self.client.post(
+            f"/api/academics/sessions/{response.data['id']}/activate/",
+            {},
+            format="json",
+        )
+        self.assertEqual(activation.status_code, status.HTTP_200_OK)
+        self.assertEqual(activation.data["status"], AcademicSessionStatus.ACTIVE)
+
+    def test_second_session_cannot_be_activated_until_first_is_closed(self):
+        first = self.create_active_session(self.coordinator)
+        second = AcademicSession.objects.create(
+            name="2027/2028",
+            start_date="2027-09-01",
+            end_date="2028-07-31",
+        )
+        response = self.client.post(
+            f"/api/academics/sessions/{second.pk}/activate/",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        first.refresh_from_db()
+        self.assertEqual(first.status, AcademicSessionStatus.ACTIVE)
+
+        close_response = self.client.post(
+            f"/api/academics/sessions/{first.pk}/close/",
+            {},
+            format="json",
+        )
+        self.assertEqual(close_response.status_code, status.HTTP_200_OK)
+        activate_response = self.client.post(
+            f"/api/academics/sessions/{second.pk}/activate/",
+            {},
+            format="json",
+        )
+        self.assertEqual(activate_response.status_code, status.HTTP_200_OK)
+
+    def test_lecturer_cannot_create_academic_session(self):
+        lecturer = self.create_user_with_role("lecturer@example.com", RoleCode.LECTURER)
+        self.client.force_authenticate(lecturer)
+        response = self.client.post(
+            "/api/academics/sessions/",
+            {
+                "name": "2026/2027",
+                "start_date": "2026-09-01",
+                "end_date": "2027-07-31",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class StudentRosterAPITests(AcademicTestDataMixin, APITestCase):
+    def setUp(self):
+        self.coordinator = self.create_user_with_role(
+            "coordinator@example.com",
+            RoleCode.PROJECT_COORDINATOR,
+        )
+        self.session = AcademicSession.objects.create(
+            name="2026/2027",
+            start_date="2026-09-01",
+            end_date="2027-07-31",
+        )
+        self.client.force_authenticate(self.coordinator)
+
+    def test_coordinator_can_add_student_roster_record(self):
+        response = self.client.post(
+            "/api/academics/roster/",
+            {
+                "session": str(self.session.pk),
+                "matric_number": " cs/2026/001 ",
+                "first_name": "Ada",
+                "last_name": "Okafor",
+                "other_names": "Chiamaka",
+                "is_eligible": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["matric_number"], "CS/2026/001")
+        self.assertEqual(response.data["source"], RosterRecordSource.MANUAL)
+
+    def test_duplicate_matric_number_is_rejected_within_session(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+        )
+        response = self.client.post(
+            "/api/academics/roster/",
+            {
+                "session": str(self.session.pk),
+                "matric_number": "cs/2026/001",
+                "first_name": "Another",
+                "last_name": "Student",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_student_cannot_manage_roster(self):
+        student = self.create_user_with_role("student@example.com", RoleCode.STUDENT)
+        self.client.force_authenticate(student)
+        response = self.client.get("/api/academics/roster/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_xlsx_import_preview(self):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["matric_number", "first_name", "last_name", "email"])
+        worksheet.append(["CS/2026/010", "Ngozi", "Eze", "ngozi@example.com"])
+        content = BytesIO()
+        workbook.save(content)
+        upload = SimpleUploadedFile(
+            "students.xlsx",
+            content.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response = self.client.post(
+            "/api/academics/roster-imports/preview/",
+            {"session": str(self.session.pk), "file": upload},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["valid_rows"], 1)
+        self.assertEqual(response.data["rows"][0]["matric_number"], "CS/2026/010")
+
+    def test_csv_import_preview_and_commit(self):
+        csv_content = (
+            "matric_number,first_name,last_name,email,is_eligible\n"
+            "CS/2026/001,Ada,Okafor,ada@example.com,yes\n"
+            "CS/2026/001,Duplicate,Student,,yes\n"
+            ",Missing,Matric,,yes\n"
+        )
+        upload = SimpleUploadedFile(
+            "students.csv",
+            csv_content.encode("utf-8"),
+            content_type="text/csv",
+        )
+        preview = self.client.post(
+            "/api/academics/roster-imports/preview/",
+            {"session": str(self.session.pk), "file": upload},
+            format="multipart",
+        )
+        self.assertEqual(preview.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(preview.data["valid_rows"], 1)
+        self.assertEqual(preview.data["duplicate_rows"], 1)
+        self.assertEqual(preview.data["invalid_rows"], 1)
+
+        commit = self.client.post(
+            f"/api/academics/roster-imports/{preview.data['id']}/commit/",
+            {},
+            format="json",
+        )
+        self.assertEqual(commit.status_code, status.HTTP_200_OK)
+        self.assertEqual(commit.data["imported_rows"], 1)
+        self.assertEqual(
+            StudentRosterRecord.objects.filter(session=self.session).count(),
+            1,
+        )
+
+
+class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
+    def setUp(self):
+        self.coordinator = self.create_user_with_role(
+            "coordinator@example.com",
+            RoleCode.PROJECT_COORDINATOR,
+        )
+        self.session = self.create_active_session(self.coordinator)
+
+    def registration_payload(self, **overrides):
+        payload = {
+            "email": "ada@example.com",
+            "password": "Unique-Student-Password-927!",
+            "first_name": "Ada",
+            "last_name": "Okafor",
+            "other_names": "Chiamaka",
+            "matric_number": "CS/2026/001",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_matching_roster_record_is_automatically_verified(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.AUTO_VERIFIED,
+        )
+        user = User.objects.get(email="ada@example.com")
+        self.assertTrue(user.has_role(RoleCode.STUDENT))
+
+    def test_name_mismatch_is_referred_for_manual_review(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(first_name="Different"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+
+    def test_registration_requires_active_academic_session(self):
+        self.session.status = AcademicSessionStatus.CLOSED
+        self.session.save(update_fields=["status"])
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_coordinator_can_manually_approve_pending_registration(self):
+        registration = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(first_name="Unmatched"),
+            format="json",
+        )
+        self.assertEqual(registration.status_code, status.HTTP_201_CREATED)
+        enrollment_id = registration.data["enrollment"]["id"]
+        self.client.force_authenticate(self.coordinator)
+        review = self.client.post(
+            f"/api/academics/enrollments/{enrollment_id}/review/",
+            {"decision": "approve", "notes": "Verified against departmental records."},
+            format="json",
+        )
+        self.assertEqual(review.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            review.data["verification_status"],
+            StudentVerificationStatus.MANUALLY_APPROVED,
+        )
+
+
+class LecturerAndSupervisorAPITests(AcademicTestDataMixin, APITestCase):
+    def setUp(self):
+        self.coordinator = self.create_user_with_role(
+            "coordinator@example.com",
+            RoleCode.PROJECT_COORDINATOR,
+        )
+        self.session = self.create_active_session(self.coordinator)
+        self.student = User.objects.create_user(
+            email="student@example.com",
+            password="Strong-student-password-123",
+            first_name="Ada",
+            last_name="Okafor",
+        )
+        UserRole.objects.create(
+            user=self.student,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        self.enrollment = StudentEnrollment.objects.create(
+            user=self.student,
+            session=self.session,
+            matric_number="CS/2026/001",
+            verification_status=StudentVerificationStatus.AUTO_VERIFIED,
+            verification_method="automatic",
+        )
+        self.lecturer_one = self.create_lecturer("lecturer.one@example.com", "STAFF001")
+        self.lecturer_two = self.create_lecturer("lecturer.two@example.com", "STAFF002")
+        self.client.force_authenticate(self.coordinator)
+
+    def create_lecturer(self, email, staff_number):
+        user = self.create_user_with_role(email, RoleCode.LECTURER)
+        return LecturerProfile.objects.create(user=user, staff_number=staff_number)
+
+    def test_coordinator_can_create_lecturer_account(self):
+        response = self.client.post(
+            "/api/academics/lecturers/",
+            {
+                "email": "new.lecturer@example.com",
+                "password": "Strong-Lecturer-Password-927!",
+                "first_name": "Grace",
+                "last_name": "Nwosu",
+                "staff_number": "STAFF003",
+                "designation": "Lecturer II",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(User.objects.get(email="new.lecturer@example.com").has_role(RoleCode.LECTURER))
+
+    def test_coordinator_can_assign_and_reassign_supervisor(self):
+        assignment_response = self.client.post(
+            "/api/academics/supervisor-assignments/assign/",
+            {
+                "student_enrollment": str(self.enrollment.pk),
+                "lecturer": str(self.lecturer_one.pk),
+            },
+            format="json",
+        )
+        self.assertEqual(assignment_response.status_code, status.HTTP_201_CREATED)
+
+        missing_reason = self.client.post(
+            f"/api/academics/supervisor-assignments/{assignment_response.data['id']}/reassign/",
+            {"lecturer": str(self.lecturer_two.pk), "reason": " "},
+            format="json",
+        )
+        self.assertEqual(missing_reason.status_code, status.HTTP_400_BAD_REQUEST)
+
+        reassignment = self.client.post(
+            f"/api/academics/supervisor-assignments/{assignment_response.data['id']}/reassign/",
+            {
+                "lecturer": str(self.lecturer_two.pk),
+                "reason": "Departmental workload adjustment.",
+            },
+            format="json",
+        )
+        self.assertEqual(reassignment.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SupervisorAssignment.objects.filter(student_enrollment=self.enrollment).count(), 2)
+        old_assignment = SupervisorAssignment.objects.get(pk=assignment_response.data["id"])
+        self.assertFalse(old_assignment.is_current)
+        self.assertEqual(old_assignment.ended_by, self.coordinator)
+        self.assertEqual(reassignment.data["reassignment_reason"], "Departmental workload adjustment.")
+
+    def test_unverified_student_cannot_be_assigned_a_supervisor(self):
+        self.enrollment.verification_status = StudentVerificationStatus.PENDING_REVIEW
+        self.enrollment.save(update_fields=["verification_status"])
+        response = self.client.post(
+            "/api/academics/supervisor-assignments/assign/",
+            {
+                "student_enrollment": str(self.enrollment.pk),
+                "lecturer": str(self.lecturer_one.pk),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(SupervisorAssignment.objects.filter(student_enrollment=self.enrollment).count(), 0)
+
+    def test_student_cannot_assign_a_supervisor(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/academics/supervisor-assignments/assign/",
+            {
+                "student_enrollment": str(self.enrollment.pk),
+                "lecturer": str(self.lecturer_one.pk),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_workload_endpoint_orders_lecturers_by_active_supervisees(self):
+        assign_response = self.client.post(
+            "/api/academics/supervisor-assignments/assign/",
+            {
+                "student_enrollment": str(self.enrollment.pk),
+                "lecturer": str(self.lecturer_one.pk),
+            },
+            format="json",
+        )
+        self.assertEqual(assign_response.status_code, status.HTTP_201_CREATED)
+        response = self.client.get("/api/academics/lecturer-workloads/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[0]["lecturer_id"], str(self.lecturer_two.pk))
+        self.assertEqual(response.data[0]["active_supervisee_count"], 0)
+
+
+class AuthenticationAPITests(AcademicTestDataMixin, APITestCase):
+    def test_user_can_obtain_jwt_pair(self):
+        user = User.objects.create_user(
+            email="login@example.com",
+            password="Strong-login-password-123",
+        )
+        response = self.client.post(
+            "/api/auth/token/",
+            {"email": user.email, "password": "Strong-login-password-123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertEqual(response.data["user"]["email"], user.email)
+
+    def test_logout_blacklists_refresh_token(self):
+        user = User.objects.create_user(
+            email="logout@example.com",
+            password="Strong-logout-password-123",
+        )
+        token_response = self.client.post(
+            "/api/auth/token/",
+            {"email": user.email, "password": "Strong-logout-password-123"},
+            format="json",
+        )
+        self.assertEqual(token_response.status_code, status.HTTP_200_OK)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {token_response.data['access']}"
+        )
+        logout_response = self.client.post(
+            "/api/auth/logout/",
+            {"refresh": token_response.data["refresh"]},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_205_RESET_CONTENT)
+        refresh_response = self.client.post(
+            "/api/auth/token/refresh/",
+            {"refresh": token_response.data["refresh"]},
+            format="json",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
