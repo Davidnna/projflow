@@ -55,6 +55,9 @@ The root-level `render.yaml` defines the Django web service. Create a Render Blu
 ### Supabase
 Use the Supabase **Session pooler** connection string for the Render-hosted Django service. Copy the connection string from the Supabase dashboard; do not construct the pooler hostname or username manually.
 
+## Requirements and development baseline
+The approved functional scope is documented in [`docs/requirements/APPROVED-SRS.md`](docs/requirements/APPROVED-SRS.md). The dependency-ordered implementation plan is in [`docs/requirements/IMPLEMENTATION-ROADMAP.md`](docs/requirements/IMPLEMENTATION-ROADMAP.md). Architecture decisions and the conceptual database design are maintained under `docs/architecture/` and `docs/database/`.
+
 ## Current functionality
 This release provides:
 - Branded ProjFlow React application.
