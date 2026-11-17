@@ -2001,3 +2001,38 @@
 .feature-status-ready span {
     background: #14b8a6;
 }
+
+
+/* One-time initial Administrator setup */
+.setup-notice {
+    margin-top: 22px;
+    padding: 13px 15px;
+    border: 1px solid #dbeafe;
+    border-radius: 9px;
+    color: #315ca8;
+    background: #f8fbff;
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.setup-notice--error {
+    border-color: #fecaca;
+    color: #991b1b;
+    background: #fef2f2;
+}
+
+.setup-complete .auth-intro strong {
+    color: #263751;
+    overflow-wrap: anywhere;
+}
+
+.setup-note {
+    margin: 18px 0 0;
+    padding: 13px 15px;
+    border: 1px solid #dbeafe;
+    border-radius: 9px;
+    color: #315ca8;
+    background: #f8fbff;
+    font-size: 11px;
+    line-height: 1.7;
+}

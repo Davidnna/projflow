@@ -54,7 +54,7 @@ export default function LoginPage() {
                     <p>Coordinate academic sessions, student records and supervision responsibilities through one organised system.</p>
                     <div className="auth-visual-points"><span><b>01</b> Clear academic workflows</span><span><b>02</b> Accountable decisions</span><span><b>03</b> Connected project records</span></div>
                 </div>
-                <div className="auth-visual-footer">PROJFLOW · 0.3.0</div>
+                <div className="auth-visual-footer">PROJFLOW · 0.3.1</div>
             </aside>
         </main>
     );

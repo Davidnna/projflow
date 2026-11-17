@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.0`
+- **Current release:** `0.3.1`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` adds the authenticated React workspace and operational interfaces for the existing APIs.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -44,6 +44,15 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Lecturer account creation and lecturer directory.
 - Supervisor allocation, lecturer workload visibility and supervisor reassignment with a mandatory reason.
 - Responsive desktop and mobile layouts for the public site and authenticated workspace.
+
+
+### Implemented in 0.3.1 (initial system provisioning)
+
+- One-time public setup status endpoint and React setup page for creating the first Administrator account directly in the production database.
+- A high-entropy temporary setup secret is required; the backend compares it securely and rate-limits anonymous setup requests.
+- The endpoint creates a Django superuser and automatically assigns the ProjFlow Administrator role.
+- Database locking and an existing-administrator check prevent the initial setup route from creating a second first Administrator.
+- The setup route becomes unavailable after the first Administrator role assignment exists.
 
 ### Not implemented yet
 
@@ -356,7 +365,7 @@ $env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
 $env:DATABASE_URL = ""
 ```
 
-Apply database migrations and create the initial Administrator account:
+Apply database migrations and create a local-only development Administrator account:
 
 ```bash
 python manage.py migrate
@@ -366,7 +375,7 @@ python manage.py runserver
 
 The backend is available at `http://127.0.0.1:8000/`. Django's `create_superuser` automatically assigns the Administrator role. To create a Project Coordinator, create the account in Django administration and assign the seeded `project_coordinator` role through the UserRole administration screen.
 
-The `.env.example` files are templates; Django does not automatically load them. Set environment variables in the terminal, your IDE run configuration or your hosting provider.
+The `createsuperuser` command in this section is for a local development database only. For the deployed production Administrator, use the live one-time setup process in section 10.2. The `.env.example` files are templates; Django does not automatically load them. Set environment variables in the terminal, your IDE run configuration or your hosting provider.
 
 ### 9.4 Configure and run the frontend
 
@@ -415,7 +424,20 @@ GitHub Actions runs the backend configuration check, migration consistency check
 
 The deployed Django service uses the Supabase PostgreSQL **Session pooler** URI copied from the Supabase Connect dialog. Use the supplied URI as `DATABASE_URL` in Render. The backend requires SSL for a configured PostgreSQL URL. Do not use the Transaction pooler URI on port `6543` with this persistent Django configuration. Keep the database password and full URI private.
 
-### 10.2 Render backend
+### 10.2 Initial Administrator provisioning (live deployment)
+
+The first ProjFlow Administrator is created through the deployed web application; Render Shell and local Django commands are not required. Before any Administrator account exists:
+
+1. Generate a high-entropy random secret of at least 32 characters using a password manager.
+2. In Render, open the ProjFlow backend service and add `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` under Environment. Store the secret only in Render; do not place it in GitHub, Cloudflare Pages, source code or a message.
+3. Save the environment change and wait for Render to finish restarting the service.
+4. Open `https://YOUR-CLOUDFLARE-PAGES-DOMAIN/setup/administrator` and enter the temporary secret, Administrator name, email and a strong account password. The setup request is processed by Django and writes directly to the configured production Supabase PostgreSQL database.
+5. After the page confirms success, remove `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` from Render Environment and save the change.
+6. Sign in through the normal ProjFlow login page.
+
+The backend refuses setup when the secret is absent or shorter than 32 characters, compares the supplied secret using a constant-time comparison, limits anonymous setup requests, validates the account password using Django's configured validators, and permits the operation only while no Administrator role assignment or Django superuser exists. The operation is transactionally protected. The setup page does not display or store the configured secret.
+
+### 10.3 Render backend
 
 The root `render.yaml` defines the Django service:
 
@@ -435,12 +457,13 @@ Configure these environment values in Render:
 | `DJANGO_SECURE_SSL_REDIRECT` | `true` |
 | `DJANGO_ALLOWED_HOSTS` | `.onrender.com,localhost,127.0.0.1` |
 | `DATABASE_URL` | Supabase Session pooler URI |
+| `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` | Temporary random secret for first Administrator setup; remove after setup |
 | `CORS_ALLOWED_ORIGINS` | Exact Cloudflare Pages origin |
 | `CSRF_TRUSTED_ORIGINS` | Exact Cloudflare Pages origin |
 
 The Render start command applies committed migrations before starting Gunicorn. This is configured for the current service plan; use a dedicated pre-deploy migration step if the hosting plan supports it.
 
-### 10.3 Cloudflare Pages frontend
+### 10.4 Cloudflare Pages frontend
 
 Connect the GitHub repository through Cloudflare Pages and configure:
 
@@ -456,7 +479,7 @@ Set `VITE_API_BASE_URL` to the actual Render service origin without a trailing s
 
 After Cloudflare creates the Pages URL, set the exact origin (including `https://`, with no path or trailing slash) in both `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` on Render, then redeploy.
 
-### 10.4 Deployment verification
+### 10.5 Deployment verification
 
 - `https://YOUR-RENDER-SERVICE.onrender.com/api/health/` should return HTTP 200 and `status: ok`.
 - `https://YOUR-RENDER-SERVICE.onrender.com/api/ready/` should return HTTP 200 and `database: connected`.
@@ -464,7 +487,7 @@ After Cloudflare creates the Pages URL, set the exact origin (including `https:/
 
 Render's free service may sleep after inactivity. Its local filesystem is ephemeral and must not be used for permanent student documents. Supabase Free has storage/compute limits and may pause projects; production use requires a documented backup and retention arrangement.
 
-### 10.5 Supabase activity keep-alive workflow
+### 10.6 Supabase activity keep-alive workflow
 
 The repository includes `.github/workflows/supabase-keepalive.yml`. It calls the deployed `/api/ready/` endpoint twice daily and can also be run manually. Configure the GitHub Actions repository variable `PROJFLOW_READINESS_URL` with the exact Render readiness URL after deployment. The workflow does not contain database credentials and is best-effort, not a guarantee against Supabase pausing.
 

@@ -76,7 +76,7 @@ export default function HomePage() {
             <section className="closing-section">
                 <div className="closing-panel">
                     <div>
-                        <div className="eyebrow eyebrow-on-dark">PROJFLOW 0.3.0</div>
+                        <div className="eyebrow eyebrow-on-dark">PROJFLOW 0.3.1</div>
                         <h2>Academic administration is now available.</h2>
                         <p>The authenticated workspace now supports student onboarding, academic sessions, lecturer management and supervisor allocation. Project-topic review, submissions, examinations and results will follow in later releases.</p>
                     </div>

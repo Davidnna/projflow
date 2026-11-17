@@ -8,7 +8,7 @@ class HealthEndpointTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], "ok")
         self.assertEqual(response.data["service"], "projflow-api")
-        self.assertEqual(response.data["version"], "0.2.0")
+        self.assertEqual(response.data["version"], "0.3.1")
 
     def test_readiness_endpoint_reports_database_connection(self):
         response = self.client.get("/api/ready/")

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 @permission_classes([AllowAny])
 def health_check(request):
     return Response(
-        {"status": "ok", "service": "projflow-api", "version": "0.2.0"},
+        {"status": "ok", "service": "projflow-api", "version": "0.3.1"},
         status=status.HTTP_200_OK,
     )
 

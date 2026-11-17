@@ -7,6 +7,7 @@ import PlatformPage from "./pages/PlatformPage.jsx";
 import StatusPage from "./pages/StatusPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import RegisterPage from "./pages/auth/RegisterPage.jsx";
+import InitialAdministratorSetupPage from "./pages/auth/InitialAdministratorSetupPage.jsx";
 import DashboardOverview from "./pages/dashboard/DashboardOverview.jsx";
 import SessionsPage from "./pages/coordinator/SessionsPage.jsx";
 import StudentsPage from "./pages/coordinator/StudentsPage.jsx";
@@ -26,6 +27,7 @@ export default function App() {
             </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/setup/administrator" element={<InitialAdministratorSetupPage />} />
             <Route element={<ProtectedRoute />}>
                 <Route path="/app" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/app/overview" replace />} />

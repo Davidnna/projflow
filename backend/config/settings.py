@@ -11,6 +11,9 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "False").strip().lower() in {
     "true", "1", "yes"
 }
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN = os.environ.get(
+    "PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN", ""
+).strip()
 if not SECRET_KEY:
     raise ImproperlyConfigured(
         "DJANGO_SECRET_KEY must be provided through the environment."
@@ -117,6 +120,9 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_RATES": {
+        "initial_admin_setup": "5/hour",
+    },
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],

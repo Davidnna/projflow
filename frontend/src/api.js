@@ -239,6 +239,7 @@ export function getList(payload) {
 export const endpoints = {
     login: "/api/auth/token/",
     register: "/api/auth/register/",
+    initialAdministratorSetup: "/api/auth/initial-admin/",
     logout: "/api/auth/logout/",
     sessions: "/api/academics/sessions/",
     roster: "/api/academics/roster/",
