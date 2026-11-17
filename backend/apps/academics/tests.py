@@ -288,8 +288,12 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.AUTO_VERIFIED,
         )
-        self.assertEqual(response.data["enrollment"]["verification_notes"], "")
-        self.assertEqual(response.data["enrollment"]["phone"], "08030000001")
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertEqual(enrollment.verification_notes, "")
+        self.assertEqual(enrollment.phone, "08030000001")
+        self.assertNotIn("verification_notes", response.data["enrollment"])
+        self.assertNotIn("verification_method", response.data["enrollment"])
+        self.assertNotIn("user_id", response.data)
 
     def test_missing_roster_record_is_referred_with_a_clear_reason(self):
         response = self.client.post(
@@ -302,7 +306,9 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.PENDING_REVIEW,
         )
-        self.assertIn("No matching matriculation number", response.data["enrollment"]["verification_notes"])
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertIn("No matching matriculation number", enrollment.verification_notes)
+        self.assertNotIn("verification_notes", response.data["enrollment"])
 
     def test_ineligible_roster_record_is_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(
@@ -323,7 +329,8 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.PENDING_REVIEW,
         )
-        self.assertIn("not marked as eligible", response.data["enrollment"]["verification_notes"])
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertIn("not marked as eligible", enrollment.verification_notes)
 
     def test_email_mismatch_is_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(
@@ -344,7 +351,8 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.PENDING_REVIEW,
         )
-        self.assertIn("Email address does not match", response.data["enrollment"]["verification_notes"])
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertIn("Email address does not match", enrollment.verification_notes)
 
     def test_phone_mismatch_is_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(
@@ -365,7 +373,8 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.PENDING_REVIEW,
         )
-        self.assertIn("Phone number does not match", response.data["enrollment"]["verification_notes"])
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertIn("Phone number does not match", enrollment.verification_notes)
 
     def test_missing_recorded_other_names_are_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(
@@ -385,7 +394,8 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             response.data["enrollment"]["verification_status"],
             StudentVerificationStatus.PENDING_REVIEW,
         )
-        self.assertIn("Other names do not match", response.data["enrollment"]["verification_notes"])
+        enrollment = StudentEnrollment.objects.get(user__email="ada@example.com")
+        self.assertIn("Other names do not match", enrollment.verification_notes)
 
     def test_name_mismatch_is_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(
@@ -415,6 +425,35 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_student_status_endpoints_do_not_expose_internal_verification_details(self):
+        registration = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(first_name="Unmatched"),
+            format="json",
+        )
+        self.assertEqual(registration.status_code, status.HTTP_201_CREATED)
+        student_user = User.objects.get(email="ada@example.com")
+        self.client.force_authenticate(student_user)
+
+        for url in [
+            "/api/academics/enrollments/mine/",
+            "/api/academics/enrollments/",
+        ]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            if isinstance(response.data, list):
+                records = response.data
+            elif isinstance(response.data, dict) and isinstance(response.data.get("results"), list):
+                records = response.data["results"]
+            else:
+                records = [response.data]
+            for record in records:
+                self.assertNotIn("verification_notes", record)
+                self.assertNotIn("verification_method", record)
+                self.assertNotIn("review_notes", record)
+                self.assertNotIn("reviewed_by", record)
+                self.assertNotIn("verified_at", record)
+
     def test_coordinator_can_manually_approve_pending_registration(self):
         registration = self.client.post(
             "/api/auth/register/",
@@ -422,7 +461,11 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             format="json",
         )
         self.assertEqual(registration.status_code, status.HTTP_201_CREATED)
-        enrollment_id = registration.data["enrollment"]["id"]
+        student_user = User.objects.get(email="ada@example.com")
+        enrollment_id = StudentEnrollment.objects.get(
+            user=student_user,
+            session=self.session,
+        ).pk
         self.client.force_authenticate(self.coordinator)
         review = self.client.post(
             f"/api/academics/enrollments/{enrollment_id}/review/",

@@ -8,10 +8,7 @@ from rest_framework.response import Response
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health_check(request):
-    return Response(
-        {"status": "ok", "service": "projflow-api", "version": "0.3.3"},
-        status=status.HTTP_200_OK,
-    )
+    return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -23,10 +20,7 @@ def readiness_check(request):
             cursor.fetchone()
     except DatabaseError:
         return Response(
-            {"status": "not_ready", "database": "unavailable"},
+            {"status": "not_ready"},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-    return Response(
-        {"status": "ready", "database": "connected"},
-        status=status.HTTP_200_OK,
-    )
+    return Response({"status": "ready"}, status=status.HTTP_200_OK)

@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.3`
+- **Current release:** `0.3.4`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -24,8 +24,8 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Student self-registration API using email, password and matriculation number.
 - Automatic student verification when the active-session roster record and all populated identity fields match: matriculation number, first name, last name, other names (when recorded), email (when recorded), phone (when recorded) and eligibility.
 - Case-insensitive name/email matching and tolerant phone formatting for harmless spaces, brackets, dots and hyphens.
-- Manual registration review only for missing roster records, ineligible records or identity-field mismatches, with mismatch reasons visible to the student and review team.
-- Student phone number and verification explanation retained on the enrollment record.
+- Manual registration review only for missing roster records, ineligible records or identity-field mismatches, with mismatch reasons retained for the review team.
+- Student phone number and verification explanation retained on the enrollment record for authorised review.
 - Lecturer account and profile API for creation by an Administrator or Project Coordinator.
 - Supervisor allocation to verified students in the active academic session.
 - Lecturer workload visibility, ordered from the lowest active supervisee count.
@@ -36,7 +36,7 @@ Release `0.1.0` established the branded React application, Django API, custom us
 
 ### Implemented in 0.3.0 (frontend)
 
-- Public overview, platform information and live API/database status pages.
+- Public overview and platform information pages.
 - Student login and self-registration interfaces connected to the Django API.
 - JWT access-token handling, refresh-token rotation and authenticated route protection.
 - Role-aware workspace navigation and dashboard views for Administrators, Project Coordinators, Lecturers and Students.
@@ -73,6 +73,15 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Exact eligible matches are automatically verified without Administrator or Coordinator approval.
 - Missing roster records, ineligible records and mismatches are sent to the manual review queue with a concise explanation of the mismatch.
 - The registration form collects the phone number where it is present in the departmental register and explains that names/contact details must match the roster.
+
+### Implemented in 0.3.4 (user-facing information cleanup)
+
+- Removed public pages that exposed API, database, hosting or release details.
+- Removed the completed initial Administrator setup page from normal site navigation; the old setup URL now returns users to sign-in.
+- Replaced release labels and development-roadmap notices with concise, task-focused descriptions.
+- Student-facing registration responses and enrollment endpoints expose only the student's name, matriculation number, academic session and registration status; internal verification notes, method and review metadata remain restricted to authorised staff records.
+- General service errors no longer disclose deployment configuration or internal server details.
+- Public health/readiness checks retain their operational function without returning service version or database-provider status.
 - Enrollment records retain the submitted phone number and verification explanation.
 
 ### Not implemented yet
@@ -223,7 +232,7 @@ Access tokens expire after 15 minutes. Refresh tokens expire after 7 days and ar
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/health/` | Public API liveness check |
-| `GET` | `/api/ready/` | Public database readiness check |
+| `GET` | `/api/ready/` | Readiness check; returns HTTP 200 when the service is ready |
 
 ### Academic sessions
 
@@ -450,12 +459,12 @@ The deployed Django service uses the Supabase PostgreSQL **Session pooler** URI 
 
 ### 10.2 Initial Administrator provisioning (live deployment)
 
-The first ProjFlow Administrator is created through the deployed web application; Render Shell and local Django commands are not required. Before any Administrator account exists:
+The first ProjFlow Administrator was created through the deployed web application; Render Shell and local Django commands were not required. The one-time setup page is removed from the normal public site after initial provisioning. If the production database is ever recreated, restore the setup page from the initial-provisioning commit before creating the first Administrator. Before any Administrator account exists:
 
 1. Generate a high-entropy random secret of at least 32 characters using a password manager.
 2. In Render, open the ProjFlow backend service and add `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` under Environment. Store the secret only in Render; do not place it in GitHub, Cloudflare Pages, source code or a message.
 3. Save the environment change and wait for Render to finish restarting the service.
-4. Open `https://YOUR-CLOUDFLARE-PAGES-DOMAIN/setup/administrator` and enter the temporary secret, Administrator name, email and a strong account password. The setup request is processed by Django and writes directly to the configured production Supabase PostgreSQL database.
+4. Temporarily restore the initial setup page from the initial-provisioning commit, deploy it, and open `https://YOUR-CLOUDFLARE-PAGES-DOMAIN/setup/administrator` to enter the temporary secret, Administrator name, email and a strong account password. The setup request is processed by Django and writes directly to the configured production database.
 5. After the page confirms success, remove `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` from Render Environment and save the change.
 6. Sign in through the normal ProjFlow login page.
 

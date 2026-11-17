@@ -170,7 +170,6 @@ class StudentRegistrationView(APIView):
         return Response(
             {
                 "message": "Registration submitted successfully.",
-                "user_id": str(user.pk),
                 "email": user.email,
                 "enrollment": StudentRegistrationStatusSerializer(enrollment).data,
             },
@@ -181,6 +180,11 @@ class StudentRegistrationView(APIView):
 class StudentEnrollmentViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = StudentEnrollmentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if is_coordinator_or_administrator(self.request.user):
+            return StudentEnrollmentSerializer
+        return StudentRegistrationStatusSerializer
     queryset = StudentEnrollment.objects.select_related(
         "user",
         "session",

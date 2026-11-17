@@ -21,10 +21,28 @@ export function StatCard({ label, value, detail, icon, tone = "blue" }) {
 }
 
 export function StatusBadge({ value, children }) {
-    const label = children || String(value || "Unknown").replaceAll("_", " ");
-    const tone = ["active", "auto_verified", "manually_approved", "committed", "approved"].includes(value)
+    const labels = {
+        active: "Active",
+        auto_verified: "Verified",
+        manually_approved: "Verified",
+        pending_review: "Awaiting review",
+        rejected: "Rejected",
+        planned: "Not active",
+        closed: "Closed",
+        previewed: "Ready to import",
+        committed: "Imported",
+        valid: "Valid",
+        invalid: "Needs attention",
+        duplicate: "Duplicate",
+        inactive: "Inactive",
+        approved: "Approved",
+        pending: "Pending",
+    };
+    const fallback = String(value || "Unknown").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+    const label = children || labels[value] || fallback;
+    const tone = ["active", "auto_verified", "manually_approved", "committed", "approved", "valid"].includes(value)
         ? "success"
-        : ["pending_review", "planned", "previewed", "pending"].includes(value)
+        : ["pending_review", "planned", "previewed", "pending", "invalid", "duplicate"].includes(value)
             ? "warning"
             : ["closed", "rejected", "inactive"].includes(value) ? "muted" : "info";
     return <span className={`state-badge state-badge--${tone}`}>{label}</span>;

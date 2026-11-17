@@ -44,10 +44,10 @@ export default function DashboardLayout() {
                         </NavLink>
                     ))}
                     {!isCoordinator && isLecturer && (
-                        <div className="sidebar-note">Supervision tools will appear here as the next project modules are released.</div>
+                        <div className="sidebar-note">Your assigned students and supervision activities will appear here.</div>
                     )}
                     {!isCoordinator && !isLecturer && (
-                        <div className="sidebar-note">Your project workspace will expand as your registration and supervision progress.</div>
+                        <div className="sidebar-note">Your registration details and project information will appear here.</div>
                     )}
                 </nav>
                 <div className="sidebar-bottom">
@@ -70,7 +70,7 @@ export default function DashboardLayout() {
                     </div>
                 </header>
                 <main className="workspace-content"><Outlet /></main>
-                <footer className="workspace-footer"><span>ProjFlow · From Proposal to Final Defence</span><span>Academic administration workspace</span></footer>
+                <footer className="workspace-footer"><span>ProjFlow · From Proposal to Final Defence</span><span>Your department's project workspace</span></footer>
             </div>
             {menuOpen && <button className="sidebar-backdrop" onClick={() => setMenuOpen(false)} aria-label="Close navigation" />}
         </div>

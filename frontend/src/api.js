@@ -153,7 +153,7 @@ export async function restoreAuthSession() {
 
 export async function apiRequest(path, options = {}) {
     if (!API_BASE_URL) {
-        throw new ApiError("The API address has not been configured. Set VITE_API_BASE_URL and redeploy the frontend.");
+        throw new ApiError("ProjFlow is temporarily unavailable. Please try again later.");
     }
 
     const {
@@ -186,7 +186,7 @@ export async function apiRequest(path, options = {}) {
         if (error.name === "AbortError" || error.name === "TimeoutError") {
             throw new ApiError("The request timed out. Please try again.");
         }
-        throw new ApiError("Could not reach the ProjFlow API. Check your connection and try again.");
+        throw new ApiError("We couldn't complete your request. Check your connection and try again.");
     }
 
     if (response.status === 401 && auth && retry) {
@@ -198,32 +198,27 @@ export async function apiRequest(path, options = {}) {
 
     const payload = await parseResponse(response);
     if (!response.ok) {
+        if (response.status >= 500) {
+            throw new ApiError("Something went wrong. Please try again later.", response.status);
+        }
+        if (response.status === 401) {
+            const message = path === "/api/auth/token/"
+                ? "The email address or password is incorrect."
+                : "Your session has expired. Please sign in again.";
+            throw new ApiError(message, response.status);
+        }
+        if (response.status === 403) {
+            throw new ApiError("You don't have permission to complete this action.", response.status);
+        }
+        if (response.status === 404) {
+            throw new ApiError("The requested information could not be found.", response.status);
+        }
+        if (response.status === 429) {
+            throw new ApiError("Too many attempts. Please wait a moment and try again.", response.status);
+        }
         throw new ApiError(getErrorMessage(payload), response.status, payload);
     }
     return payload;
-}
-
-export async function checkPlatformStatus() {
-    if (!API_BASE_URL) {
-        return { configured: false, api: "not-configured", database: "not-checked" };
-    }
-
-    const [healthResult, readinessResult] = await Promise.allSettled([
-        apiRequest("/api/health/", { auth: false }),
-        apiRequest("/api/ready/", { auth: false }),
-    ]);
-
-    const api = healthResult.status === "fulfilled" ? "online" : "unavailable";
-    const database = readinessResult.status === "fulfilled"
-        && readinessResult.value?.database === "connected"
-        ? "connected" : "unavailable";
-
-    return {
-        configured: true,
-        api,
-        database,
-        apiPayload: healthResult.status === "fulfilled" ? healthResult.value : null,
-    };
 }
 
 export function getList(payload) {
@@ -239,7 +234,6 @@ export function getList(payload) {
 export const endpoints = {
     login: "/api/auth/token/",
     register: "/api/auth/register/",
-    initialAdministratorSetup: "/api/auth/initial-admin/",
     logout: "/api/auth/logout/",
     sessions: "/api/academics/sessions/",
     roster: "/api/academics/roster/",

@@ -372,16 +372,9 @@ class StudentRegistrationStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentEnrollment
         fields = [
-            "id",
             "student_name",
             "matric_number",
             "session_name",
-            "phone",
-            "verification_notes",
             "verification_status",
-            "verification_method",
-            "verified_at",
-            "reviewed_at",
-            "review_notes",
         ]
         read_only_fields = fields

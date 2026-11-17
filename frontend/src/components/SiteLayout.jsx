@@ -11,8 +11,7 @@ export default function SiteLayout() {
                     <BrandLogo />
                     <nav className="main-nav" aria-label="Main navigation">
                         <NavLink to="/" end>Overview</NavLink>
-                        <NavLink to="/platform">Platform</NavLink>
-                        <NavLink to="/status">System status</NavLink>
+                        <NavLink to="/platform">About ProjFlow</NavLink>
                     </nav>
                     {isAuthenticated
                         ? <Link className="header-action" to="/app/overview">Open workspace <span aria-hidden="true">↗</span></Link>

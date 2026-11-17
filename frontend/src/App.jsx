@@ -4,10 +4,8 @@ import DashboardLayout from "./components/dashboard/DashboardLayout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import PlatformPage from "./pages/PlatformPage.jsx";
-import StatusPage from "./pages/StatusPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import RegisterPage from "./pages/auth/RegisterPage.jsx";
-import InitialAdministratorSetupPage from "./pages/auth/InitialAdministratorSetupPage.jsx";
 import DashboardOverview from "./pages/dashboard/DashboardOverview.jsx";
 import SessionsPage from "./pages/coordinator/SessionsPage.jsx";
 import StudentsPage from "./pages/coordinator/StudentsPage.jsx";
@@ -23,11 +21,11 @@ export default function App() {
             <Route element={<SiteLayout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/platform" element={<PlatformPage />} />
-                <Route path="/status" element={<StatusPage />} />
             </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/setup/administrator" element={<InitialAdministratorSetupPage />} />
+            <Route path="/setup/administrator" element={<Navigate to="/login" replace />} />
+            <Route path="/status" element={<Navigate to="/" replace />} />
             <Route element={<ProtectedRoute />}>
                 <Route path="/app" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/app/overview" replace />} />

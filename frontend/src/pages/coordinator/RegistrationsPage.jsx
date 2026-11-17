@@ -27,7 +27,15 @@ export default function RegistrationsPage() {
 
     useEffect(() => { loadEnrollments(); }, [loadEnrollments]);
 
-    const visibleEnrollments = useMemo(() => enrollments.filter((item) => filter === "all" || item.verification_status === filter), [enrollments, filter]);
+    const visibleEnrollments = useMemo(() => enrollments.filter((item) => {
+        if (filter === "all") {
+            return true;
+        }
+        if (filter === "verified") {
+            return ["auto_verified", "manually_approved"].includes(item.verification_status);
+        }
+        return item.verification_status === filter;
+    }), [enrollments, filter]);
 
     function openReview(enrollment, nextDecision) {
         setSelected(enrollment);
@@ -62,15 +70,15 @@ export default function RegistrationsPage() {
 
     return (
         <>
-            <PageHeader eyebrow="STUDENT ONBOARDING" title="Registration review" description="Review student registrations that could not be automatically verified against the departmental roster." />
+            <PageHeader eyebrow="STUDENT MANAGEMENT" title="Registration review" description="Review student registrations that need your attention." />
             {error && <Alert type="error" onClose={() => setError("")}>{error}</Alert>}
             {success && <Alert type="success" onClose={() => setSuccess("")}>{success}</Alert>}
-            <div className="queue-summary"><div><span className="queue-summary-icon">◷</span><span><strong>{pendingCount}</strong><small>Awaiting manual review</small></span></div><p>Automatically verified students do not require manual approval. Rejected registrations remain in the historical record.</p></div>
+            <div className="queue-summary"><div><span className="queue-summary-icon">◷</span><span><strong>{pendingCount}</strong><small>Awaiting review</small></span></div><p>Registrations requiring further review are listed here.</p></div>
             <section className="surface-card dashboard-table-card">
-                <div className="surface-card-heading"><div><span className="panel-eyebrow">REGISTRATION QUEUE</span><h2>Student registrations <span className="heading-count">{visibleEnrollments.length}</span></h2></div><div className="table-toolbar"><select aria-label="Filter registration status" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending_review">Pending review</option><option value="auto_verified">Automatically verified</option><option value="manually_approved">Manually approved</option><option value="rejected">Rejected</option><option value="all">All registrations</option></select></div></div>
-                {loading ? <LoadingState /> : visibleEnrollments.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Student</th><th>Matriculation no.</th><th>Academic session</th><th>Verification</th><th>Registered</th><th>Action</th></tr></thead><tbody>
-                    {visibleEnrollments.map((item) => <tr key={item.id}><td><strong>{item.student_name}</strong><small>{item.student_email}</small>{item.verification_notes && <small className="table-muted">{item.verification_notes}</small>}</td><td>{item.matric_number}</td><td>{item.session_name}</td><td><StatusBadge value={item.verification_status} /></td><td>{new Date(item.created_at).toLocaleDateString()}</td><td>{item.verification_status === "pending_review" ? <div className="table-actions"><button className="table-action table-action--primary" onClick={() => openReview(item, "approve")}>Approve</button><button className="table-action table-action--danger" onClick={() => openReview(item, "reject")}>Reject</button></div> : <span className="table-muted">Reviewed</span>}</td></tr>)}
-                </tbody></table></div> : <EmptyState title="No registrations in this view" description={filter === "pending_review" ? "There are no student registrations awaiting manual verification." : "Try another status filter to view other registrations."} />}
+                <div className="surface-card-heading"><div><span className="panel-eyebrow">REGISTRATION QUEUE</span><h2>Student registrations <span className="heading-count">{visibleEnrollments.length}</span></h2></div><div className="table-toolbar"><select aria-label="Filter registration status" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="pending_review">Awaiting review</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="all">All registrations</option></select></div></div>
+                {loading ? <LoadingState /> : visibleEnrollments.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Student</th><th>Matriculation no.</th><th>Academic session</th><th>Status</th><th>Registered</th><th>Action</th></tr></thead><tbody>
+                    {visibleEnrollments.map((item) => <tr key={item.id}><td><strong>{item.student_name}</strong><small>{item.student_email}</small>{item.verification_notes && <small className="table-muted">Review note: {item.verification_notes}</small>}</td><td>{item.matric_number}</td><td>{item.session_name}</td><td><StatusBadge value={item.verification_status} /></td><td>{new Date(item.created_at).toLocaleDateString()}</td><td>{item.verification_status === "pending_review" ? <div className="table-actions"><button className="table-action table-action--primary" onClick={() => openReview(item, "approve")}>Approve</button><button className="table-action table-action--danger" onClick={() => openReview(item, "reject")}>Reject</button></div> : <span className="table-muted">Reviewed</span>}</td></tr>)}
+                </tbody></table></div> : <EmptyState title="No registrations in this view" description={filter === "pending_review" ? "There are no student registrations awaiting review." : "No registrations match this selection."} />}
             </section>
             {selected && <Modal title={decision === "approve" ? "Approve student registration" : "Reject student registration"} description={`${selected.student_name} · ${selected.matric_number}`} onClose={() => setSelected(null)}>
                 <form className="modal-form" onSubmit={submitReview}>
