@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.2.0`
+- **Current release:** `0.3.0`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,9 +13,9 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduces the first academic administration backend modules.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` adds the authenticated React workspace and operational interfaces for the existing APIs.
 
-### Implemented in 0.2.0
+### Implemented in 0.2.0 (backend)
 
 - Academic session creation, activation and closure through the backend API.
 - Database enforcement of one active academic session at a time.
@@ -32,9 +32,22 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Role-based API permissions for academic administration operations.
 - Django administration screens for the new academic records.
 
+### Implemented in 0.3.0 (frontend)
+
+- Public overview, platform information and live API/database status pages.
+- Student login and self-registration interfaces connected to the Django API.
+- JWT access-token handling, refresh-token rotation and authenticated route protection.
+- Role-aware workspace navigation and dashboard views for Administrators, Project Coordinators, Lecturers and Students.
+- Coordinator academic session management, including creation, activation and closure.
+- Student roster management with manual record entry and CSV/XLSX import preview and commit.
+- Student registration review with approve/reject decisions and rejection reasons.
+- Lecturer account creation and lecturer directory.
+- Supervisor allocation, lecturer workload visibility and supervisor reassignment with a mandatory reason.
+- Responsive desktop and mobile layouts for the public site and authenticated workspace.
+
 ### Not implemented yet
 
-The current React frontend still contains the public overview, platform and status pages. Login/registration screens, Coordinator and Lecturer administration screens, and role-specific dashboards are not yet implemented. The following modules are planned for later development and must not be treated as operational features in this release:
+The following modules are planned for later development and must not be treated as operational features in this release:
 
 - Project-topic proposals, supervisor topic decisions and local topic-similarity analysis.
 - Chapter and final-project submissions, private Supabase Storage integration and annotated feedback.
@@ -43,7 +56,7 @@ The current React frontend still contains the public overview, platform and stat
 - Examination panels, defence scheduling and supervisor conflict-of-interest checks.
 - Supervisor-configured assessment templates, examiner scoring, result approval, publication and appeals.
 - In-app and email notifications with user-controlled preferences for each notification category.
-- Role-specific operational dashboards.
+- Advanced project-specific dashboards for topic review, submissions, progress monitoring, examinations and results.
 
 ## 2. Technology stack
 
@@ -228,7 +241,7 @@ Imports are previewed before records are created. Invalid rows and duplicates ar
 | `GET` | `/api/academics/enrollments/mine/` | Retrieve the authenticated student's registration status |
 | `POST` | `/api/academics/enrollments/{id}/review/` | Approve or reject a pending registration (Coordinator/Administrator) |
 
-Student registration requires an active academic session. Passwords must be at least 12 characters and pass Django's configured password validators. A student cannot register the same matriculation number twice in one session. The backend registration API is available, but the React registration and login interfaces are not part of this update.
+Student registration requires an active academic session. Passwords must be at least 12 characters and pass Django's configured password validators. A student cannot register the same matriculation number twice in one session. The React registration interface is available in release 0.3.0. After submission, the student receives the registration status and can sign in to monitor verification.
 
 ### Lecturer accounts and supervisor allocation
 
@@ -263,7 +276,7 @@ Sensitive changes are performed through transactional service functions. Academi
 
 - Django enforces role and object-level access. Frontend visibility is not a security boundary.
 - Passwords are stored using Django's password hashing framework.
-- JWTs are sent in the `Authorization` header; cross-origin cookie credentials are not used by the SPA API configuration.
+- JWTs are sent in the `Authorization` header; cross-origin cookie credentials are not used by the SPA API configuration. The access token is held in application memory, while the rotating refresh token and minimal user profile are kept in `sessionStorage` for the browser session.
 - Production secrets and database connection strings belong in Render environment settings, never in source control.
 - Student registration records are restricted according to role and relationship.
 - Lecturer profile deactivation prevents new supervisor allocations while retaining the user account and historical assignments; this avoids disabling a user who may hold another global role.

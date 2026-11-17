@@ -1,7 +1,9 @@
-import { NavLink, Link } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext.jsx";
 import BrandLogo from "./BrandLogo.jsx";
 
-export default function SiteLayout({ children }) {
+export default function SiteLayout() {
+    const { isAuthenticated } = useAuth();
     return (
         <div className="site-shell">
             <header className="site-header">
@@ -12,10 +14,12 @@ export default function SiteLayout({ children }) {
                         <NavLink to="/platform">Platform</NavLink>
                         <NavLink to="/status">System status</NavLink>
                     </nav>
-                    <Link className="header-action" to="/status">System status <span aria-hidden="true">↗</span></Link>
+                    {isAuthenticated
+                        ? <Link className="header-action" to="/app/overview">Open workspace <span aria-hidden="true">↗</span></Link>
+                        : <div className="public-header-actions"><Link className="public-login-link" to="/login">Sign in</Link><Link className="header-action" to="/register">Student registration <span aria-hidden="true">↗</span></Link></div>}
                 </div>
             </header>
-            <main>{children}</main>
+            <main><Outlet /></main>
             <footer className="site-footer">
                 <div className="footer-inner">
                     <BrandLogo compact />

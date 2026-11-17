@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 
 const features = [
-    { number: "01", title: "Project coordination", description: "A structured view of student projects, project cycles and departmental activity." },
-    { number: "02", title: "Academic supervision", description: "Supervisor allocation, topic review, chapter submissions and documented feedback." },
-    { number: "03", title: "Examination and assessment", description: "Flexible examination groups, panel assignments and transparent assessment records." },
+    { number: "01", title: "Academic administration", description: "Academic sessions, student onboarding, departmental records, lecturer accounts and supervisor allocation.", status: "Available", ready: true },
+    { number: "02", title: "Academic supervision", description: "Topic review, chapter submissions, annotated feedback and milestone-based project progress.", status: "In development" },
+    { number: "03", title: "Examination and assessment", description: "Defence panels, independent examiner scoring, result approval and student appeals.", status: "Planned" },
 ];
 const stages = [
     ["01", "Propose", "Topic submission and review"],
@@ -67,7 +67,7 @@ export default function HomePage() {
                         <article className="feature-card" key={feature.number}>
                             <div className="feature-card-top"><span className="feature-number">{feature.number}</span><span className="feature-arrow">↗</span></div>
                             <h3>{feature.title}</h3><p>{feature.description}</p>
-                            <span className="feature-status"><span />In development</span>
+                            <span className={`feature-status${feature.ready ? " feature-status-ready" : ""}`}><span />{feature.status}</span>
                         </article>
                     ))}
                 </div>
@@ -76,9 +76,9 @@ export default function HomePage() {
             <section className="closing-section">
                 <div className="closing-panel">
                     <div>
-                        <div className="eyebrow eyebrow-on-dark">PROJFLOW 0.2.0</div>
-                        <h2>The foundation is online. The platform is taking shape.</h2>
-                        <p>This is the initial deployment of ProjFlow. Academic management modules will be introduced and verified in planned releases.</p>
+                        <div className="eyebrow eyebrow-on-dark">PROJFLOW 0.3.0</div>
+                        <h2>Academic administration is now available.</h2>
+                        <p>The authenticated workspace now supports student onboarding, academic sessions, lecturer management and supervisor allocation. Project-topic review, submissions, examinations and results will follow in later releases.</p>
                     </div>
                     <Link className="button button-light" to="/status">View deployment status <span aria-hidden="true">→</span></Link>
                 </div>
