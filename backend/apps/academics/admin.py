@@ -13,7 +13,8 @@ from .models import (
 
 @admin.register(AcademicSession)
 class AcademicSessionAdmin(admin.ModelAdmin):
-    list_display = ("name", "start_date", "end_date", "status", "created_at")
+    list_display = ("name", "status", "created_at")
+    exclude = ("start_date", "end_date")
     list_filter = ("status",)
     search_fields = ("name",)
     readonly_fields = ("created_at", "updated_at")

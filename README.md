@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.1`
+- **Current release:** `0.3.2`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -38,7 +38,7 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Student login and self-registration interfaces connected to the Django API.
 - JWT access-token handling, refresh-token rotation and authenticated route protection.
 - Role-aware workspace navigation and dashboard views for Administrators, Project Coordinators, Lecturers and Students.
-- Coordinator academic session management, including creation, activation and closure.
+- Coordinator academic session management, including name-only creation and manual activation/closure without calendar-date requirements.
 - Student roster management with manual record entry and CSV/XLSX import preview and commit.
 - Student registration review with approve/reject decisions and rejection reasons.
 - Lecturer account creation and lecturer directory.
@@ -53,6 +53,14 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - The endpoint creates a Django superuser and automatically assigns the ProjFlow Administrator role.
 - Database locking and an existing-administrator check prevent the initial setup route from creating a second first Administrator.
 - The setup route becomes unavailable after the first Administrator role assignment exists.
+
+### Implemented in 0.3.2 (manual academic session lifecycle)
+
+- Academic sessions are created using a session name only; start and end dates are not required or shown in the application.
+- The Project Coordinator manually activates and closes sessions when departmental operations are ready.
+- No academic session transition is triggered automatically by calendar dates.
+- Only one academic session may be active at a time, and previous sessions remain available for historical records.
+- Existing session date values are preserved as nullable legacy metadata; they do not control session status.
 
 ### Not implemented yet
 
@@ -128,13 +136,14 @@ A user may hold more than one global role. API access is checked by Django; hidi
 
 ### 5.1 Academic sessions and student onboarding
 
-1. The Project Coordinator creates an academic session.
-2. The Coordinator imports student records through CSV/XLSX or enters them individually.
-3. A student self-registers with an email address, password, matriculation number and name details.
-4. ProjFlow checks the matriculation number against the active session's departmental roster.
-5. An eligible matching record with matching names is automatically verified.
-6. An unmatched, ineligible or inconsistent record is referred for manual review by the Project Coordinator.
-7. Only verified students can be allocated a supervisor.
+1. The Project Coordinator creates an academic session using its name; no start or end dates are required.
+2. The Coordinator manually activates the session when the department is ready. Only one session may be active at a time; the Coordinator closes it manually when the project cycle is complete.
+3. The Coordinator imports student records through CSV/XLSX or enters them individually.
+4. A student self-registers with an email address, password, matriculation number and name details.
+5. ProjFlow checks the matriculation number against the active session's departmental roster.
+6. An eligible matching record with matching names is automatically verified.
+7. An unmatched, ineligible or inconsistent record is referred for manual review by the Project Coordinator.
+8. Only verified students can be allocated a supervisor.
 
 The Coordinator can approve or reject a registration requiring manual review. Rejection requires a reason. Pending students can authenticate to check their registration status, but future project actions must enforce verified-enrolment permissions.
 
@@ -205,6 +214,8 @@ Access tokens expire after 15 minutes. Refresh tokens expire after 7 days and ar
 
 ### Academic sessions
 
+Academic sessions are created with a name only. Start and end dates are not required or exposed through the application API. The Coordinator manually activates and closes sessions; calendar dates never trigger lifecycle transitions. Existing date values are preserved as nullable legacy metadata.
+
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/academics/sessions/` | List sessions |
@@ -214,7 +225,7 @@ Access tokens expire after 15 minutes. Refresh tokens expire after 7 days and ar
 | `POST` | `/api/academics/sessions/{id}/activate/` | Activate a planned session |
 | `POST` | `/api/academics/sessions/{id}/close/` | Close the active session |
 
-A second session cannot be activated until the current active session is closed. Session records are retained and cannot be deleted through the API.
+A second session cannot be activated until the current active session is closed. Session records are retained and cannot be deleted through the API. Session status is changed only through the explicit activate and close actions.
 
 ### Departmental student roster
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { apiRequest, endpoints, getList } from "../../api.js";
-import { Alert, EmptyState, LoadingState, PageHeader, StatCard, StatusBadge, formatDate, getInitials } from "../../components/dashboard/WorkspaceUI.jsx";
+import { Alert, EmptyState, LoadingState, PageHeader, StatCard, StatusBadge, getInitials } from "../../components/dashboard/WorkspaceUI.jsx";
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
 
@@ -66,7 +66,7 @@ function CoordinatorOverview() {
             )}
             <div className="active-session-banner">
                 <div className="active-session-mark">▦</div>
-                <div><span>ACTIVE ACADEMIC SESSION</span><strong>{activeSession?.name || "No active session"}</strong><small>{activeSession ? `${formatDate(activeSession.start_date)} – ${formatDate(activeSession.end_date)}` : "Set up the next project cycle to begin departmental operations."}</small></div>
+                <div><span>ACTIVE ACADEMIC SESSION</span><strong>{activeSession?.name || "No active session"}</strong><small>{activeSession ? "Project cycle status is controlled manually by the Project Coordinator." : "Activate a project cycle when the department is ready to begin operations."}</small></div>
                 <StatusBadge value={activeSession?.status || "planned"}>{activeSession ? "Active" : "Not started"}</StatusBadge>
             </div>
             {data && (

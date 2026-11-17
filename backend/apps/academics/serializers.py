@@ -27,8 +27,6 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "start_date",
-            "end_date",
             "status",
             "created_by_email",
             "updated_by_email",
@@ -43,18 +41,6 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-    def validate(self, attrs):
-        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
-        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
-        if start_date and end_date and end_date < start_date:
-            raise serializers.ValidationError({"end_date": "End date cannot precede start date."})
-        if self.instance and self.instance.status != AcademicSessionStatus.PLANNED:
-            if {"start_date", "end_date"} & set(attrs):
-                raise serializers.ValidationError(
-                    "Dates cannot be changed after an academic session has been activated."
-                )
-        return attrs
 
 
 class StudentRosterRecordSerializer(serializers.ModelSerializer):

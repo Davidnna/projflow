@@ -25,7 +25,7 @@ export default function PlatformPage() {
                     </article>
                 ))}
             </div>
-            <div className="scope-note"><div className="scope-icon">i</div><div><strong>Release 0.3.1</strong><p>Authentication and the first academic administration interfaces are available. Topic proposals, project submissions, progress monitoring, examinations and results remain planned modules and are not yet operational.</p></div></div>
+            <div className="scope-note"><div className="scope-icon">i</div><div><strong>Release 0.3.2</strong><p>Authentication and the first academic administration interfaces are available. Topic proposals, project submissions, progress monitoring, examinations and results remain planned modules and are not yet operational.</p></div></div>
             <div className="page-back-link"><Link to="/">← Back to overview</Link></div>
         </section>
     );

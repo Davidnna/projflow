@@ -52,7 +52,7 @@ export default function StatusPage() {
                     <StatusValue value={result.database} />
                 </div>
                 {!result.configured && <div className="status-notice">The frontend has not yet been configured with the Render API address. Set <code>VITE_API_BASE_URL</code> in Cloudflare Pages after the backend has been deployed.</div>}
-                <div className="status-panel-footer"><span>{lastChecked ? `Last checked: ${lastChecked.toLocaleTimeString()}` : "Waiting for first check"}</span><span>ProjFlow v0.3.1</span></div>
+                <div className="status-panel-footer"><span>{lastChecked ? `Last checked: ${lastChecked.toLocaleTimeString()}` : "Waiting for first check"}</span><span>ProjFlow v0.3.2</span></div>
             </div>
             <div className="status-help">
                 <strong>What do these checks mean?</strong>

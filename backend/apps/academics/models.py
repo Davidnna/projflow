@@ -52,8 +52,8 @@ def normalise_person_name(value):
 class AcademicSession(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    start_date = models.DateField(blank=True, null=True, editable=False)
+    end_date = models.DateField(blank=True, null=True, editable=False)
     status = models.CharField(
         max_length=12,
         choices=AcademicSessionStatus.choices,
@@ -78,7 +78,7 @@ class AcademicSession(models.Model):
 
     class Meta:
         db_table = "academics_session"
-        ordering = ["-start_date", "name"]
+        ordering = ["-created_at", "name"]
         constraints = [
             models.UniqueConstraint(
                 fields=["status"],
@@ -86,12 +86,6 @@ class AcademicSession(models.Model):
                 name="academics_one_active_session",
             )
         ]
-
-    def clean(self):
-        if self.end_date and self.start_date and self.end_date < self.start_date:
-            from django.core.exceptions import ValidationError
-
-            raise ValidationError({"end_date": "End date cannot precede start date."})
 
     def __str__(self):
         return self.name

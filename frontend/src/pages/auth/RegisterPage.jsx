@@ -48,7 +48,7 @@ export default function RegisterPage() {
                     </div>
                     <div className="auth-legal">© {new Date().getFullYear()} ProjFlow · From Proposal to Final Defence</div>
                 </section>
-                <aside className="auth-panel auth-panel--visual"><div className="auth-visual-orbit auth-orbit-one" /><div className="auth-visual-orbit auth-orbit-two" /><div className="auth-visual-content"><div className="auth-visual-mark">PF</div><div className="auth-visual-kicker">STUDENT ONBOARDING</div><h2>A structured start to your final-year project.</h2><p>Once your registration is verified, the Project Coordinator will allocate your supervisor before topic proposal submission.</p></div><div className="auth-visual-footer">PROJFLOW · 0.3.1</div></aside>
+                <aside className="auth-panel auth-panel--visual"><div className="auth-visual-orbit auth-orbit-one" /><div className="auth-visual-orbit auth-orbit-two" /><div className="auth-visual-content"><div className="auth-visual-mark">PF</div><div className="auth-visual-kicker">STUDENT ONBOARDING</div><h2>A structured start to your final-year project.</h2><p>Once your registration is verified, the Project Coordinator will allocate your supervisor before topic proposal submission.</p></div><div className="auth-visual-footer">PROJFLOW · 0.3.2</div></aside>
             </main>
         );
     }
@@ -75,7 +75,7 @@ export default function RegisterPage() {
                 </div>
                 <div className="auth-legal">© {new Date().getFullYear()} ProjFlow · From Proposal to Final Defence</div>
             </section>
-            <aside className="auth-panel auth-panel--visual"><div className="auth-visual-orbit auth-orbit-one" /><div className="auth-visual-orbit auth-orbit-two" /><div className="auth-visual-content"><div className="auth-visual-mark">PF</div><div className="auth-visual-kicker">STUDENT ONBOARDING</div><h2>Start with the right academic record.</h2><p>ProjFlow checks registration details against the departmental roster. Unmatched or inconsistent records are referred for manual review.</p><div className="auth-visual-points"><span><b>01</b> Register your details</span><span><b>02</b> Verify your eligibility</span><span><b>03</b> Receive supervisor allocation</span></div></div><div className="auth-visual-footer">PROJFLOW · 0.3.1</div></aside>
+            <aside className="auth-panel auth-panel--visual"><div className="auth-visual-orbit auth-orbit-one" /><div className="auth-visual-orbit auth-orbit-two" /><div className="auth-visual-content"><div className="auth-visual-mark">PF</div><div className="auth-visual-kicker">STUDENT ONBOARDING</div><h2>Start with the right academic record.</h2><p>ProjFlow checks registration details against the departmental roster. Unmatched or inconsistent records are referred for manual review.</p><div className="auth-visual-points"><span><b>01</b> Register your details</span><span><b>02</b> Verify your eligibility</span><span><b>03</b> Receive supervisor allocation</span></div></div><div className="auth-visual-footer">PROJFLOW · 0.3.2</div></aside>
         </main>
     );
 }

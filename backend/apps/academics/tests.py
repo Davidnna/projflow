@@ -38,8 +38,6 @@ class AcademicTestDataMixin:
     def create_active_session(self, actor=None, name="2026/2027"):
         session = AcademicSession.objects.create(
             name=name,
-            start_date="2026-09-01",
-            end_date="2027-07-31",
             created_by=actor,
         )
         if actor:
@@ -64,13 +62,16 @@ class AcademicSessionAPITests(AcademicTestDataMixin, APITestCase):
             "/api/academics/sessions/",
             {
                 "name": "2026/2027",
-                "start_date": "2026-09-01",
-                "end_date": "2027-07-31",
             },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], AcademicSessionStatus.PLANNED)
+        self.assertNotIn("start_date", response.data)
+        self.assertNotIn("end_date", response.data)
+        created_session = AcademicSession.objects.get(pk=response.data["id"])
+        self.assertIsNone(created_session.start_date)
+        self.assertIsNone(created_session.end_date)
 
         activation = self.client.post(
             f"/api/academics/sessions/{response.data['id']}/activate/",
@@ -82,11 +83,7 @@ class AcademicSessionAPITests(AcademicTestDataMixin, APITestCase):
 
     def test_second_session_cannot_be_activated_until_first_is_closed(self):
         first = self.create_active_session(self.coordinator)
-        second = AcademicSession.objects.create(
-            name="2027/2028",
-            start_date="2027-09-01",
-            end_date="2028-07-31",
-        )
+        second = AcademicSession.objects.create(name="2027/2028")
         response = self.client.post(
             f"/api/academics/sessions/{second.pk}/activate/",
             {},
@@ -116,8 +113,6 @@ class AcademicSessionAPITests(AcademicTestDataMixin, APITestCase):
             "/api/academics/sessions/",
             {
                 "name": "2026/2027",
-                "start_date": "2026-09-01",
-                "end_date": "2027-07-31",
             },
             format="json",
         )
@@ -130,11 +125,7 @@ class StudentRosterAPITests(AcademicTestDataMixin, APITestCase):
             "coordinator@example.com",
             RoleCode.PROJECT_COORDINATOR,
         )
-        self.session = AcademicSession.objects.create(
-            name="2026/2027",
-            start_date="2026-09-01",
-            end_date="2027-07-31",
-        )
+        self.session = AcademicSession.objects.create(name="2026/2027")
         self.client.force_authenticate(self.coordinator)
 
     def test_coordinator_can_add_student_roster_record(self):
