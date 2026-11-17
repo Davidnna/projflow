@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.2`
+- **Current release:** `0.3.3`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -22,8 +22,10 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Departmental student roster API for manual entry and CSV/XLSX import.
 - Spreadsheet import preview, row-level validation, duplicate detection and explicit commit.
 - Student self-registration API using email, password and matriculation number.
-- Automatic student verification when the active-session roster record and submitted names match.
-- Manual registration review for unmatched, ineligible or inconsistent records.
+- Automatic student verification when the active-session roster record and all populated identity fields match: matriculation number, first name, last name, other names (when recorded), email (when recorded), phone (when recorded) and eligibility.
+- Case-insensitive name/email matching and tolerant phone formatting for harmless spaces, brackets, dots and hyphens.
+- Manual registration review only for missing roster records, ineligible records or identity-field mismatches, with mismatch reasons visible to the student and review team.
+- Student phone number and verification explanation retained on the enrollment record.
 - Lecturer account and profile API for creation by an Administrator or Project Coordinator.
 - Supervisor allocation to verified students in the active academic session.
 - Lecturer workload visibility, ordered from the lowest active supervisee count.
@@ -61,6 +63,17 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - No academic session transition is triggered automatically by calendar dates.
 - Only one academic session may be active at a time, and previous sessions remain available for historical records.
 - Existing session date values are preserved as nullable legacy metadata; they do not control session status.
+
+### Implemented in 0.3.3 (complete student roster verification)
+
+- Student self-registration compares the matriculation number against the active academic session's roster.
+- The system also compares first name and last name, and compares other names, email and phone whenever those values are populated in the departmental roster.
+- Name and email comparisons ignore letter case and repeated/leading/trailing whitespace. Phone comparison ignores harmless spaces, brackets, dots and hyphens.
+- A roster record marked ineligible cannot be automatically verified.
+- Exact eligible matches are automatically verified without Administrator or Coordinator approval.
+- Missing roster records, ineligible records and mismatches are sent to the manual review queue with a concise explanation of the mismatch.
+- The registration form collects the phone number where it is present in the departmental register and explains that names/contact details must match the roster.
+- Enrollment records retain the submitted phone number and verification explanation.
 
 ### Not implemented yet
 
@@ -139,10 +152,10 @@ A user may hold more than one global role. API access is checked by Django; hidi
 1. The Project Coordinator creates an academic session using its name; no start or end dates are required.
 2. The Coordinator manually activates the session when the department is ready. Only one session may be active at a time; the Coordinator closes it manually when the project cycle is complete.
 3. The Coordinator imports student records through CSV/XLSX or enters them individually.
-4. A student self-registers with an email address, password, matriculation number and name details.
-5. ProjFlow checks the matriculation number against the active session's departmental roster.
-6. An eligible matching record with matching names is automatically verified.
-7. An unmatched, ineligible or inconsistent record is referred for manual review by the Project Coordinator.
+4. A student self-registers with an email address, password, matriculation number, names and phone number where applicable.
+5. ProjFlow checks the matriculation number against the active session's departmental roster and compares all populated roster identity fields.
+6. An eligible record with matching first name, last name and any recorded other names, email and phone number is automatically verified.
+7. A missing, ineligible or inconsistent record is referred for manual review by the Project Coordinator, with the reason recorded.
 8. Only verified students can be allocated a supervisor.
 
 The Coordinator can approve or reject a registration requiring manual review. Rejection requires a reason. Pending students can authenticate to check their registration status, but future project actions must enforce verified-enrolment permissions.

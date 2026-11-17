@@ -85,11 +85,12 @@ class StudentEnrollmentAdmin(admin.ModelAdmin):
         "session",
         "verification_status",
         "verification_method",
+        "phone",
         "created_at",
     )
     list_filter = ("session", "verification_status", "verification_method")
     search_fields = ("matric_number", "user__email", "user__first_name", "user__last_name")
-    readonly_fields = ("created_at", "verified_at", "reviewed_at")
+    readonly_fields = ("created_at", "verified_at", "reviewed_at", "verification_notes")
 
 
 @admin.register(LecturerProfile)

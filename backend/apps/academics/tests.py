@@ -242,6 +242,7 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             "last_name": "Okafor",
             "other_names": "Chiamaka",
             "matric_number": "CS/2026/001",
+            "phone": "",
         }
         payload.update(overrides)
         return payload
@@ -266,6 +267,125 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
         )
         user = User.objects.get(email="ada@example.com")
         self.assertTrue(user.has_role(RoleCode.STUDENT))
+
+    def test_all_populated_roster_details_are_matched_for_automatic_verification(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+            email="ADA@EXAMPLE.COM",
+            phone="0803 000-0001",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(phone="08030000001"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.AUTO_VERIFIED,
+        )
+        self.assertEqual(response.data["enrollment"]["verification_notes"], "")
+        self.assertEqual(response.data["enrollment"]["phone"], "08030000001")
+
+    def test_missing_roster_record_is_referred_with_a_clear_reason(self):
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+        self.assertIn("No matching matriculation number", response.data["enrollment"]["verification_notes"])
+
+    def test_ineligible_roster_record_is_referred_for_manual_review(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+            is_eligible=False,
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+        self.assertIn("not marked as eligible", response.data["enrollment"]["verification_notes"])
+
+    def test_email_mismatch_is_referred_for_manual_review(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+            email="departmental@example.com",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+        self.assertIn("Email address does not match", response.data["enrollment"]["verification_notes"])
+
+    def test_phone_mismatch_is_referred_for_manual_review(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+            phone="08030000001",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(phone="08030000002"),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+        self.assertIn("Phone number does not match", response.data["enrollment"]["verification_notes"])
+
+    def test_missing_recorded_other_names_are_referred_for_manual_review(self):
+        StudentRosterRecord.objects.create(
+            session=self.session,
+            matric_number="CS/2026/001",
+            first_name="Ada",
+            last_name="Okafor",
+            other_names="Chiamaka",
+        )
+        response = self.client.post(
+            "/api/auth/register/",
+            self.registration_payload(other_names=""),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            response.data["enrollment"]["verification_status"],
+            StudentVerificationStatus.PENDING_REVIEW,
+        )
+        self.assertIn("Other names do not match", response.data["enrollment"]["verification_notes"])
 
     def test_name_mismatch_is_referred_for_manual_review(self):
         StudentRosterRecord.objects.create(

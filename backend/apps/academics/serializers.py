@@ -106,6 +106,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
     other_names = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
     matric_number = serializers.CharField(max_length=40)
 
     def validate_email(self, value):
@@ -137,6 +138,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
             last_name=validated_data["last_name"],
             other_names=validated_data.get("other_names", ""),
             matric_number=validated_data["matric_number"],
+            phone=validated_data.get("phone", ""),
         )
 
 
@@ -162,6 +164,8 @@ class StudentEnrollmentSerializer(serializers.ModelSerializer):
             "roster_record_eligible",
             "matric_number",
             "other_names",
+            "phone",
+            "verification_notes",
             "verification_status",
             "verification_method",
             "verified_at",
@@ -372,6 +376,8 @@ class StudentRegistrationStatusSerializer(serializers.ModelSerializer):
             "student_name",
             "matric_number",
             "session_name",
+            "phone",
+            "verification_notes",
             "verification_status",
             "verification_method",
             "verified_at",

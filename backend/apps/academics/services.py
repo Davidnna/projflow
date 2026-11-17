@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -57,18 +59,44 @@ def close_academic_session(session_id, actor):
         return session
 
 
-def names_match(roster_record, first_name, last_name, other_names=""):
+def normalise_email(value):
+    return str(value or "").strip().casefold()
+
+
+def normalise_phone(value):
+    return re.sub(r"[\s().-]", "", str(value or "")).casefold()
+
+
+def roster_registration_mismatches(
+    roster_record,
+    *,
+    email,
+    first_name,
+    last_name,
+    other_names="",
+    phone="",
+):
+    if roster_record is None:
+        return ["No matching matriculation number was found in the active session's departmental register."]
+
+    mismatches = []
+    if not roster_record.is_eligible:
+        mismatches.append("The departmental record is not marked as eligible for final-year project registration.")
     if normalise_person_name(roster_record.first_name) != normalise_person_name(first_name):
-        return False
+        mismatches.append("First name does not match the departmental record.")
     if normalise_person_name(roster_record.last_name) != normalise_person_name(last_name):
-        return False
-    if roster_record.other_names:
-        return normalise_person_name(roster_record.other_names) == normalise_person_name(other_names)
-    return True
+        mismatches.append("Last name does not match the departmental record.")
+    if roster_record.other_names and normalise_person_name(roster_record.other_names) != normalise_person_name(other_names):
+        mismatches.append("Other names do not match the departmental record.")
+    if roster_record.email and normalise_email(roster_record.email) != normalise_email(email):
+        mismatches.append("Email address does not match the departmental record.")
+    if roster_record.phone and normalise_phone(roster_record.phone) != normalise_phone(phone):
+        mismatches.append("Phone number does not match the departmental record.")
+    return mismatches
 
 
 @transaction.atomic
-def register_student(*, email, password, first_name, last_name, other_names, matric_number):
+def register_student(*, email, password, first_name, last_name, other_names, matric_number, phone=""):
     active_session = AcademicSession.objects.select_for_update().filter(
         status=AcademicSessionStatus.ACTIVE
     ).first()
@@ -87,14 +115,18 @@ def register_student(*, email, password, first_name, last_name, other_names, mat
         matric_number=normalized_matric,
     ).first()
 
+    verification_mismatches = roster_registration_mismatches(
+        roster_record,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        other_names=other_names,
+        phone=phone,
+    )
     verification_status = StudentVerificationStatus.PENDING_REVIEW
     verification_method = ""
     verified_at = None
-    if (
-        roster_record
-        and roster_record.is_eligible
-        and names_match(roster_record, first_name, last_name, other_names)
-    ):
+    if not verification_mismatches:
         verification_status = StudentVerificationStatus.AUTO_VERIFIED
         verification_method = VerificationMethod.AUTOMATIC
         verified_at = timezone.now()
@@ -116,6 +148,8 @@ def register_student(*, email, password, first_name, last_name, other_names, mat
                 roster_record=roster_record,
                 matric_number=normalized_matric,
                 other_names=other_names.strip(),
+                phone=phone.strip(),
+                verification_notes=" ".join(verification_mismatches),
                 verification_status=verification_status,
                 verification_method=verification_method,
                 verified_at=verified_at,

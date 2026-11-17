@@ -252,6 +252,8 @@ class StudentEnrollment(models.Model):
     )
     matric_number = models.CharField(max_length=40)
     other_names = models.CharField(max_length=150, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    verification_notes = models.TextField(blank=True)
     verification_status = models.CharField(
         max_length=20,
         choices=StudentVerificationStatus.choices,

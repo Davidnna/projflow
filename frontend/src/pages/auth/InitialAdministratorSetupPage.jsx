@@ -136,7 +136,7 @@ export default function InitialAdministratorSetupPage() {
                     <p>The one-time setup secret protects account creation. After the first Administrator is created, this setup process closes automatically.</p>
                     <div className="auth-visual-points"><span><b>01</b> Live production database</span><span><b>02</b> One-time setup access</span><span><b>03</b> Automatic Administrator role</span></div>
                 </div>
-                <div className="auth-visual-footer">PROJFLOW · 0.3.2</div>
+                <div className="auth-visual-footer">PROJFLOW · 0.3.3</div>
             </aside>
         </main>
     );
