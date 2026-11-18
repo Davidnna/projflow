@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.4`
+- **Current release:** `0.3.5`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -83,6 +83,14 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - General service errors no longer disclose deployment configuration or internal server details.
 - Public health/readiness checks retain their operational function without returning service version or database-provider status.
 - Enrollment records retain the submitted phone number and verification explanation.
+
+### Implemented in 0.3.5 (expanded public website)
+
+- Expanded the public homepage with a clear product introduction, current platform capabilities, departmental workflow, user roles and common questions.
+- Added dedicated About ProjFlow, Features and How It Works pages accessible before sign-in or registration.
+- Added responsive public navigation and a structured footer with links to public information and account access.
+- Described only capabilities available in the current release; project-topic proposals, submissions, progress monitoring, defence and assessment are not represented as live features.
+- Updated page metadata and the frontend package version.
 
 ### Not implemented yet
 

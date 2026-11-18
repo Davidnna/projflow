@@ -4,6 +4,8 @@ import DashboardLayout from "./components/dashboard/DashboardLayout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import PlatformPage from "./pages/PlatformPage.jsx";
+import FeaturesPage from "./pages/FeaturesPage.jsx";
+import HowItWorksPage from "./pages/HowItWorksPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import RegisterPage from "./pages/auth/RegisterPage.jsx";
 import DashboardOverview from "./pages/dashboard/DashboardOverview.jsx";
@@ -20,7 +22,10 @@ export default function App() {
         <Routes>
             <Route element={<SiteLayout />}>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/platform" element={<PlatformPage />} />
+                <Route path="/about" element={<PlatformPage />} />
+                <Route path="/platform" element={<Navigate to="/about" replace />} />
+                <Route path="/features" element={<FeaturesPage />} />
+                <Route path="/how-it-works" element={<HowItWorksPage />} />
             </Route>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

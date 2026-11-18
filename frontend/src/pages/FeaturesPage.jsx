@@ -1,0 +1,122 @@
+import { Link } from "react-router-dom";
+
+const featureGroups = [
+    {
+        number: "01",
+        title: "Academic session management",
+        intro: "Manage the academic project cycle according to departmental decisions.",
+        points: [
+            "Create academic sessions using a session name.",
+            "Activate or close a session manually when the department is ready.",
+            "Keep previous sessions available for historical reference.",
+        ],
+    },
+    {
+        number: "02",
+        title: "Departmental student records",
+        intro: "Maintain the eligible student register for the active academic session.",
+        points: [
+            "Add or update student records individually.",
+            "Import student lists from CSV or Excel files.",
+            "Review imported records and validation results before confirming an import.",
+        ],
+    },
+    {
+        number: "03",
+        title: "Student registration and verification",
+        intro: "Give students a direct way to register while keeping the departmental register central to the process.",
+        points: [
+            "Students submit their details through the public registration page.",
+            "Eligible records with matching details are verified automatically.",
+            "Missing, ineligible or inconsistent records are referred for staff review.",
+        ],
+    },
+    {
+        number: "04",
+        title: "Lecturer records",
+        intro: "Keep lecturer information organised for departmental project coordination.",
+        points: [
+            "Create lecturer accounts from the administrative workspace.",
+            "Maintain a departmental lecturer directory.",
+            "Provide lecturers with access to their assigned supervision information.",
+        ],
+    },
+    {
+        number: "05",
+        title: "Supervisor allocation",
+        intro: "Coordinate which lecturer is responsible for each verified student.",
+        points: [
+            "Assign a supervisor to a verified student.",
+            "View lecturer supervision workloads when making assignments.",
+            "Reassign a student when necessary and retain the reason and assignment history.",
+        ],
+    },
+    {
+        number: "06",
+        title: "Role-based workspaces",
+        intro: "Present relevant information and actions according to each person's role.",
+        points: [
+            "Students access their registration and student workspace.",
+            "Lecturers view their assigned students.",
+            "Project Coordinators and Administrators manage departmental records and assignments.",
+        ],
+    },
+];
+
+export default function FeaturesPage() {
+    return (
+        <div className="public-page">
+            <section className="public-page-hero">
+                <div className="public-container public-page-hero-inner">
+                    <div className="public-eyebrow">PROJFLOW FEATURES</div>
+                    <h1>The essential tools for organised project administration.</h1>
+                    <p>
+                        ProjFlow brings together the academic session, student onboarding and supervision
+                        coordination tasks that departments manage at the start of the final-year project process.
+                    </p>
+                    <div className="public-page-actions">
+                        <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
+                        <Link className="public-text-link" to="/register">Student registration</Link>
+                    </div>
+                </div>
+            </section>
+
+            <section className="public-section public-section-white">
+                <div className="public-container">
+                    <div className="public-feature-list">
+                        {featureGroups.map((feature) => (
+                            <article className="public-feature-detail" key={feature.number}>
+                                <div className="public-feature-detail-number">{feature.number}</div>
+                                <div className="public-feature-detail-content">
+                                    <h2>{feature.title}</h2>
+                                    <p className="public-feature-detail-intro">{feature.intro}</p>
+                                    <ul>
+                                        {feature.points.map((point) => <li key={point}>{point}</li>)}
+                                    </ul>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                    <p className="public-feature-note">
+                        ProjFlow's available features are focused on academic administration, student onboarding
+                        and supervisor coordination. Access to each workspace depends on the user's role.
+                    </p>
+                </div>
+            </section>
+
+            <section className="public-cta-section">
+                <div className="public-container public-cta-panel">
+                    <div>
+                        <div className="public-eyebrow public-eyebrow-light">START HERE</div>
+                        <h2>Are you a student in the department?</h2>
+                        <p>Use your departmental details to create your ProjFlow account.</p>
+                    </div>
+                    <div className="public-cta-actions">
+                        <Link className="public-button public-button-light" to="/register">Student registration <span aria-hidden="true">→</span></Link>
+                        <Link className="public-cta-signin" to="/login">Already registered? Sign in</Link>
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+}
