@@ -85,6 +85,16 @@ class ProjectTopicViewSet(viewsets.ModelViewSet):
         )
         return Response(self.get_serializer(topics, many=True).data)
 
+    @action(detail=False, methods=["get"])
+    def supervised(self, request):
+        if not request.user.has_role(RoleCode.LECTURER):
+            raise PermissionDenied("This view is available to supervisors.")
+        topics = super().get_queryset().filter(
+            Q(supervisor_assignment__lecturer__user=request.user)
+            | Q(reviews__reviewer=request.user)
+        ).distinct().order_by("-updated_at", "-submitted_at")
+        return Response(self.get_serializer(topics, many=True).data)
+
     @action(detail=True, methods=["post"])
     def resubmit(self, request, pk=None):
         if not request.user.has_role(RoleCode.STUDENT):

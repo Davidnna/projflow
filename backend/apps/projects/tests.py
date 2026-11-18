@@ -156,6 +156,75 @@ class ProjectTopicAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([item["id"] for item in response.data], [str(topic.pk)])
 
+    def test_supervisor_can_view_topics_they_have_approved(self):
+        topic = self.create_topic()
+        self.client.force_authenticate(self.lecturer)
+        review = self.client.post(
+            f"/api/projects/topics/{topic.pk}/review/",
+            {"decision": ProjectTopicDecision.APPROVE, "feedback": "Approved."},
+            format="json",
+        )
+        self.assertEqual(review.status_code, status.HTTP_200_OK)
+
+        response = self.client.get("/api/projects/topics/supervised/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], str(topic.pk))
+        self.assertEqual(response.data[0]["status"], ProjectTopicStatus.APPROVED)
+
+        queue_response = self.client.get("/api/projects/topics/review-queue/")
+        self.assertEqual(queue_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(queue_response.data, [])
+
+    def test_previous_supervisor_can_view_topic_they_reviewed_after_reassignment(self):
+        topic = self.create_topic()
+        self.client.force_authenticate(self.lecturer)
+        approve_response = self.client.post(
+            f"/api/projects/topics/{topic.pk}/review/",
+            {"decision": ProjectTopicDecision.APPROVE, "feedback": "Approved."},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+
+        reassign_supervisor(
+            assignment_id=self.assignment.pk,
+            lecturer_id=self.other_lecturer_profile.pk,
+            actor=self.coordinator,
+            reason="Departmental workload adjustment.",
+        )
+
+        previous_supervisor_response = self.client.get("/api/projects/topics/supervised/")
+        self.assertEqual(previous_supervisor_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(previous_supervisor_response.data), 1)
+        self.assertEqual(previous_supervisor_response.data[0]["id"], str(topic.pk))
+        self.assertFalse(previous_supervisor_response.data[0]["can_review"])
+
+        self.client.force_authenticate(self.other_lecturer)
+        new_supervisor_response = self.client.get("/api/projects/topics/supervised/")
+        self.assertEqual(new_supervisor_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(new_supervisor_response.data), 1)
+        self.assertFalse(new_supervisor_response.data[0]["can_review"])
+
+    def test_supervised_topics_are_private_to_the_assigned_supervisor(self):
+        topic = self.create_topic()
+        self.client.force_authenticate(self.lecturer)
+        approve_response = self.client.post(
+            f"/api/projects/topics/{topic.pk}/review/",
+            {"decision": ProjectTopicDecision.APPROVE, "feedback": "Approved."},
+            format="json",
+        )
+        self.assertEqual(approve_response.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(self.other_lecturer)
+        response = self.client.get("/api/projects/topics/supervised/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_coordinator_cannot_access_supervisor_topic_history_endpoint(self):
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.get("/api/projects/topics/supervised/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_coordinator_cannot_make_supervisor_topic_decision(self):
         topic = self.create_topic()
         self.client.force_authenticate(self.coordinator)

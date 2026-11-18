@@ -1,10 +1,13 @@
 from rest_framework import serializers
 
+from apps.accounts.models import RoleCode
+
 from .models import (
     ProjectTopic,
     ProjectTopicDecision,
     ProjectTopicReview,
     ProjectTopicRevision,
+    ProjectTopicStatus,
 )
 
 
@@ -89,6 +92,21 @@ class ProjectTopicSerializer(serializers.ModelSerializer):
     revisions = ProjectTopicRevisionSerializer(many=True, read_only=True)
     reviews = ProjectTopicReviewSerializer(many=True, read_only=True)
     revision_count = serializers.IntegerField(source="revisions.count", read_only=True)
+    can_review = serializers.SerializerMethodField()
+
+    def get_can_review(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        if not request.user.has_role(RoleCode.LECTURER):
+            return False
+        assignment = obj.supervisor_assignment
+        return (
+            obj.status == ProjectTopicStatus.SUBMITTED
+            and obj.is_current
+            and assignment.is_current
+            and assignment.lecturer.user_id == request.user.id
+        )
 
     class Meta:
         model = ProjectTopic
@@ -108,6 +126,7 @@ class ProjectTopicSerializer(serializers.ModelSerializer):
             "submitted_at",
             "reviewed_at",
             "revision_count",
+            "can_review",
             "revisions",
             "reviews",
             "created_at",

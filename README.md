@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.6`
+- **Current release:** `0.3.7`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -104,6 +104,14 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Supervisor reassignment transfers responsibility for the student's current proposal to the new supervisor while preserving earlier review records.
 - Student and lecturer workspaces include project-topic submission and topic-review pages.
 - Topic records retain all submitted proposals and statuses for the historical comparison feature planned in the next increment. Automated topic similarity detection is not included in this release.
+
+### Implemented in 0.3.7 (supervisor topic register)
+
+- Added a supervisor-only endpoint that returns project topics associated with the supervisor's assignments or previously reviewed by that supervisor, including approved topics.
+- Expanded the lecturer topic workspace with filters for awaiting review, approved, revision requested, rejected and all topics.
+- Previously reviewed proposals are available in read-only detail view, including their submission and review history; decision controls remain available only to the currently assigned supervisor for proposals awaiting review.
+- The existing review queue remains limited to current submissions awaiting a supervisor decision.
+- Added API tests for approved-topic visibility, historical reviewer access after reassignment, supervisor isolation and Coordinator access restrictions.
 
 ### Not implemented yet
 
