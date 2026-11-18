@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.9`
+- **Current release:** `0.3.10`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation. Release `0.3.9` adds Coordinator-defined session milestones, student progress reports, supervisor assessments, revision requests and report history.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation. Release `0.3.9` adds Coordinator-defined session milestones, student progress reports, supervisor assessments, revision requests and report history. Release `0.3.10` adds an Administrator-managed Coordinator Access page for granting and revoking the Project Coordinator role while preserving Coordinator-only milestone management.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -382,7 +382,11 @@ A proposal requires a title, abstract, problem statement, research objectives an
 Similarity analysis runs after each new submission or resubmission. It compares the five proposal elements against the latest revision of each other student's topic across current and previous academic sessions, including approved and rejected topics. The engine combines local semantic embeddings and lexical term/phrase matching. The fixed threshold is 62%; only matches at or above that threshold are retained. The supervisor-only report includes the previous topic title, academic session, status, overall similarity score and relevant matched-section excerpts. Similarity scores are advisory and do not make academic decisions. If a proposal predates this feature or an analysis was unavailable, the currently assigned supervisor can run the check from the proposal detail view.
 
 
-### Project milestones and progress monitoring
+### Coordinator access
+
+Administrators can grant or remove the Project Coordinator role for active Administrator and Lecturer accounts from the Coordinator Access page. A staff member must sign in again after a role change. Project milestone creation and modification remain restricted to accounts with the Project Coordinator role.
+
+## Project milestones and progress monitoring
 
 | Method | Endpoint | Purpose |
 |---|---|---|

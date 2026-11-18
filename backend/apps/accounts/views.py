@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -15,6 +15,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Role, RoleCode, UserRole
 from .serializers import (
+    CoordinatorAccessUpdateSerializer,
     InitialAdministratorSetupSerializer,
     ProjFlowTokenObtainPairSerializer,
 )
@@ -147,3 +148,103 @@ class LogoutView(APIView):
         except TokenError as exc:
             raise ValidationError({"refresh": "The refresh token is invalid or expired."}) from exc
         return Response(status=status.HTTP_205_RESET_CONTENT)
+
+
+class CoordinatorAccessView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def ensure_administrator(self, user):
+        if not (user.is_superuser or user.has_role(RoleCode.ADMINISTRATOR)):
+            raise PermissionDenied("Only an Administrator can manage coordinator access.")
+
+    def eligible_accounts(self):
+        eligible_roles = [
+            RoleCode.ADMINISTRATOR,
+            RoleCode.LECTURER,
+            RoleCode.PROJECT_COORDINATOR,
+        ]
+        return (
+            User.objects.filter(
+                is_active=True,
+            )
+            .filter(role_assignments__role__code__in=eligible_roles)
+            .distinct()
+            .prefetch_related("role_assignments__role")
+            .order_by("first_name", "last_name", "email")
+        )
+
+    def serialize_account(self, user):
+        roles = list(
+            user.role_assignments.select_related("role").values_list(
+                "role__code", flat=True
+            )
+        )
+        return {
+            "id": str(user.pk),
+            "name": user.get_full_name() or user.email,
+            "email": user.email,
+            "roles": roles,
+            "is_active": user.is_active,
+            "has_coordinator_access": RoleCode.PROJECT_COORDINATOR in roles,
+            "can_receive_coordinator_access": bool(
+                RoleCode.ADMINISTRATOR in roles or RoleCode.LECTURER in roles
+            ),
+        }
+
+    def get(self, request):
+        self.ensure_administrator(request.user)
+        return Response([
+            self.serialize_account(user)
+            for user in self.eligible_accounts()
+        ])
+
+    def post(self, request):
+        self.ensure_administrator(request.user)
+        serializer = CoordinatorAccessUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+
+        with transaction.atomic():
+            target = User.objects.filter(
+                pk=values["user_id"],
+                is_active=True,
+            ).first()
+            if target is None or not (
+                target.has_role(RoleCode.ADMINISTRATOR)
+                or target.has_role(RoleCode.LECTURER)
+                or target.has_role(RoleCode.PROJECT_COORDINATOR)
+            ):
+                raise NotFound("The selected staff account could not be found.")
+
+            coordinator_role = Role.objects.filter(
+                code=RoleCode.PROJECT_COORDINATOR
+            ).first()
+            if coordinator_role is None:
+                raise ValidationError("Coordinator access is currently unavailable.")
+
+            if values["enabled"]:
+                if not (
+                    target.has_role(RoleCode.ADMINISTRATOR)
+                    or target.has_role(RoleCode.LECTURER)
+                ):
+                    raise ValidationError(
+                        "Coordinator access can only be granted to an Administrator or Lecturer account."
+                    )
+                UserRole.objects.get_or_create(
+                    user=target,
+                    role=coordinator_role,
+                    defaults={"assigned_by": request.user},
+                )
+                message = "Project Coordinator access granted."
+            else:
+                UserRole.objects.filter(
+                    user=target,
+                    role=coordinator_role,
+                ).delete()
+                message = "Project Coordinator access removed."
+
+        target.refresh_from_db()
+        return Response({
+            "message": message,
+            "account": self.serialize_account(target),
+        })

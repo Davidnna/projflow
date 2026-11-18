@@ -23,6 +23,7 @@ const coordinatorLinks = [
     { to: "/app/lecturers", label: "Lecturers", icon: "♧" },
     { to: "/app/supervisors", label: "Supervisor allocation", icon: "⇄" },
     { to: "/app/milestones", label: "Project milestones", icon: "⚑" },
+    { to: "/app/coordinator-access", label: "Coordinator access", icon: "♙" },
 ];
 
 export default function DashboardLayout() {
@@ -31,10 +32,17 @@ export default function DashboardLayout() {
     const navigate = useNavigate();
     const isCoordinator = hasAnyRole(["administrator", "project_coordinator"]);
     const isProjectCoordinator = hasAnyRole(["project_coordinator"]);
+    const isAdministrator = hasAnyRole(["administrator"]);
     const isLecturer = hasAnyRole(["lecturer"]);
-    const visibleCoordinatorLinks = coordinatorLinks.filter(
-        (link) => link.to !== "/app/milestones" || isProjectCoordinator,
-    );
+    const visibleCoordinatorLinks = coordinatorLinks.filter((link) => {
+        if (link.to === "/app/milestones") {
+            return isProjectCoordinator;
+        }
+        if (link.to === "/app/coordinator-access") {
+            return isAdministrator;
+        }
+        return true;
+    });
     const links = [
         ...(isCoordinator ? visibleCoordinatorLinks : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }]),
         ...(isLecturer && isCoordinator ? lecturerLinks.slice(1) : isLecturer ? lecturerLinks.slice(1) : []),

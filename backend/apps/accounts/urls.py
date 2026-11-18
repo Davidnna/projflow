@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from apps.academics.views import StudentRegistrationView
 
 from .views import (
+    CoordinatorAccessView,
     InitialAdministratorSetupView,
     LogoutView,
     ProjFlowTokenObtainPairView,
@@ -11,6 +12,7 @@ from .views import (
 
 urlpatterns = [
     path("register/", StudentRegistrationView.as_view(), name="student-registration"),
+    path("coordinator-access/", CoordinatorAccessView.as_view(), name="coordinator-access"),
     path(
         "initial-admin/",
         InitialAdministratorSetupView.as_view(),

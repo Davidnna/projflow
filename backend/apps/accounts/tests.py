@@ -134,3 +134,87 @@ class InitialAdministratorSetupTests(APITestCase):
         self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
         availability_response = self.client.get(self.endpoint)
         self.assertFalse(availability_response.data["setup_available"])
+
+
+class CoordinatorAccessTests(APITestCase):
+    def setUp(self):
+        self.administrator = User.objects.create_superuser(
+            email="admin-coordinator@example.com",
+            password="Strong-admin-password-123",
+        )
+        self.lecturer = User.objects.create_user(
+            email="lecturer-coordinator@example.com",
+            password="Strong-lecturer-password-123",
+            first_name="Ada",
+            last_name="Lecturer",
+        )
+        UserRole.objects.create(
+            user=self.lecturer,
+            role=Role.objects.get(code=RoleCode.LECTURER),
+        )
+        self.student = User.objects.create_user(
+            email="student-coordinator@example.com",
+            password="Strong-student-password-123",
+        )
+        UserRole.objects.create(
+            user=self.student,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        self.endpoint = "/api/auth/coordinator-access/"
+
+    def test_administrator_can_list_eligible_staff_accounts(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.get(self.endpoint)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        account_ids = {item["id"] for item in response.data}
+        self.assertIn(str(self.administrator.pk), account_ids)
+        self.assertIn(str(self.lecturer.pk), account_ids)
+        self.assertNotIn(str(self.student.pk), account_ids)
+
+    def test_administrator_can_grant_coordinator_access_to_self(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            self.endpoint,
+            {"user_id": str(self.administrator.pk), "enabled": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(self.administrator.has_role(RoleCode.PROJECT_COORDINATOR))
+        self.assertTrue(response.data["account"]["has_coordinator_access"])
+
+    def test_administrator_can_grant_coordinator_access_to_lecturer(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            self.endpoint,
+            {"user_id": str(self.lecturer.pk), "enabled": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(self.lecturer.has_role(RoleCode.PROJECT_COORDINATOR))
+
+    def test_administrator_can_revoke_coordinator_access(self):
+        coordinator_role = Role.objects.get(code=RoleCode.PROJECT_COORDINATOR)
+        UserRole.objects.create(user=self.lecturer, role=coordinator_role)
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            self.endpoint,
+            {"user_id": str(self.lecturer.pk), "enabled": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(self.lecturer.has_role(RoleCode.PROJECT_COORDINATOR))
+
+    def test_non_administrator_cannot_manage_coordinator_access(self):
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.get(self.endpoint)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_cannot_receive_coordinator_access(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            self.endpoint,
+            {"user_id": str(self.student.pk), "enabled": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(self.student.has_role(RoleCode.PROJECT_COORDINATOR))

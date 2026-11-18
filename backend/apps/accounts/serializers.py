@@ -66,3 +66,8 @@ class InitialAdministratorSetupSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"password": exc.messages}) from exc
         return attrs
+
+
+class CoordinatorAccessUpdateSerializer(serializers.Serializer):
+    user_id = serializers.UUIDField()
+    enabled = serializers.BooleanField()

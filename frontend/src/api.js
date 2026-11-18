@@ -236,6 +236,7 @@ export const endpoints = {
     login: "/api/auth/token/",
     register: "/api/auth/register/",
     logout: "/api/auth/logout/",
+    coordinatorAccess: "/api/auth/coordinator-access/",
     sessions: "/api/academics/sessions/",
     roster: "/api/academics/roster/",
     rosterImportPreview: "/api/academics/roster-imports/preview/",
