@@ -19,6 +19,12 @@ class ProjectTopicDecision(models.TextChoices):
     REJECT = "reject", "Reject"
 
 
+class SimilarityAnalysisStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    COMPLETED = "completed", "Completed"
+    UNAVAILABLE = "unavailable", "Unavailable"
+
+
 class ProjectTopic(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     student_enrollment = models.ForeignKey(
@@ -85,6 +91,14 @@ class ProjectTopicRevision(models.Model):
         related_name="project_topic_revisions",
     )
     submitted_at = models.DateTimeField(default=timezone.now)
+    similarity_embeddings = models.JSONField(default=dict, blank=True, editable=False)
+    similarity_model_name = models.CharField(max_length=120, blank=True, editable=False)
+    similarity_status = models.CharField(
+        max_length=16,
+        choices=SimilarityAnalysisStatus.choices,
+        default=SimilarityAnalysisStatus.PENDING,
+    )
+    similarity_analyzed_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         db_table = "projects_project_topic_revision"
@@ -135,3 +149,42 @@ class ProjectTopicReview(models.Model):
 
     def __str__(self):
         return f"{self.topic_id}: {self.get_decision_display()}"
+
+
+class ProjectTopicSimilarity(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source_revision = models.ForeignKey(
+        ProjectTopicRevision,
+        on_delete=models.CASCADE,
+        related_name="similarity_matches",
+    )
+    matched_revision = models.ForeignKey(
+        ProjectTopicRevision,
+        on_delete=models.PROTECT,
+        related_name="similarity_sources",
+    )
+    overall_score = models.FloatField()
+    field_scores = models.JSONField(default=dict)
+    threshold = models.FloatField()
+    model_name = models.CharField(max_length=120)
+    algorithm_version = models.CharField(max_length=32)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "projects_project_topic_similarity"
+        ordering = ["-overall_score", "matched_revision__title"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_revision", "matched_revision"],
+                name="projects_unique_topic_similarity_match",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["source_revision", "-overall_score"],
+                name="projects_similarity_src_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.source_revision_id} -> {self.matched_revision_id} ({self.overall_score:.3f})"

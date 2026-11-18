@@ -7,6 +7,7 @@ from .models import (
     ProjectTopicDecision,
     ProjectTopicReview,
     ProjectTopicRevision,
+    ProjectTopicSimilarity,
     ProjectTopicStatus,
 )
 
@@ -93,6 +94,21 @@ class ProjectTopicSerializer(serializers.ModelSerializer):
     reviews = ProjectTopicReviewSerializer(many=True, read_only=True)
     revision_count = serializers.IntegerField(source="revisions.count", read_only=True)
     can_review = serializers.SerializerMethodField()
+    can_view_similarity = serializers.SerializerMethodField()
+
+    def get_can_view_similarity(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        if (
+            request.user.is_superuser
+            or request.user.has_role(RoleCode.ADMINISTRATOR)
+            or request.user.has_role(RoleCode.PROJECT_COORDINATOR)
+            or not request.user.has_role(RoleCode.LECTURER)
+        ):
+            return False
+        assignment = obj.supervisor_assignment
+        return assignment.is_current and assignment.lecturer.user_id == request.user.id
 
     def get_can_review(self, obj):
         request = self.context.get("request")
@@ -127,9 +143,65 @@ class ProjectTopicSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "revision_count",
             "can_review",
+            "can_view_similarity",
             "revisions",
             "reviews",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+
+class ProjectTopicSimilaritySerializer(serializers.ModelSerializer):
+    previous_title = serializers.CharField(source="matched_revision.title", read_only=True)
+    academic_session = serializers.CharField(
+        source="matched_revision.topic.student_enrollment.session.name",
+        read_only=True,
+    )
+    project_status = serializers.CharField(source="matched_revision.topic.status", read_only=True)
+    project_status_label = serializers.CharField(
+        source="matched_revision.topic.get_status_display",
+        read_only=True,
+    )
+    similarity_percent = serializers.SerializerMethodField()
+    matched_sections = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectTopicSimilarity
+        fields = [
+            "id",
+            "previous_title",
+            "academic_session",
+            "project_status",
+            "project_status_label",
+            "similarity_percent",
+            "matched_sections",
+        ]
+
+    def get_similarity_percent(self, obj):
+        return round(obj.overall_score * 100, 1)
+
+    def get_matched_sections(self, obj):
+        from .similarity import FIELD_LABELS, MATCHED_SECTION_THRESHOLD
+
+        sections = []
+        revision = obj.matched_revision
+        for field, label in FIELD_LABELS.items():
+            score = float((obj.field_scores or {}).get(field, 0.0))
+            if score < MATCHED_SECTION_THRESHOLD:
+                continue
+            if field == "keywords":
+                content = ", ".join(revision.keywords or [])
+            else:
+                content = getattr(revision, field)
+            excerpt = " ".join(str(content).split())
+            if len(excerpt) > 420:
+                excerpt = f"{excerpt[:417].rstrip()}..."
+            sections.append(
+                {
+                    "section": label,
+                    "similarity_percent": round(score * 100, 1),
+                    "excerpt": excerpt,
+                }
+            )
+        return sections

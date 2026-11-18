@@ -45,8 +45,14 @@ const steps = [
     },
     {
         number: "08",
+        title: "Potentially related topics are identified",
+        description: "ProjFlow compares the proposal with topics submitted in current and previous academic sessions. Potential matches and relevant sections are shown only to the assigned supervisor as guidance for academic review.",
+        owner: "ProjFlow and assigned supervisor",
+    },
+    {
+        number: "09",
         title: "Users access their role-based workspace",
-        description: "Students follow their proposal status and feedback, lecturers review assigned proposals, and departmental administrators manage records and assignments.",
+        description: "Students follow their proposal status and feedback, lecturers review assigned proposals and similarity findings, and departmental administrators manage records and assignments.",
         owner: "Students, lecturers and administrators",
     },
 ];
@@ -67,6 +73,10 @@ const questions = [
     {
         question: "Who decides whether a project topic is approved?",
         answer: "The student's assigned supervisor reviews the proposal and decides whether to approve it, request a revision or reject it.",
+    },
+    {
+        question: "How does ProjFlow identify potentially similar topics?",
+        answer: "ProjFlow compares the proposal's title, abstract, problem statement, research objectives and keywords with historical proposals. Similarity findings are visible only to the assigned supervisor and are used as guidance; they do not automatically approve or reject a topic.",
     },
     {
         question: "Can a student revise a submitted topic?",
@@ -95,7 +105,7 @@ export default function HowItWorksPage() {
                     <h1>A clear process for students and the department.</h1>
                     <p>
                         ProjFlow supports the process from departmental setup and student onboarding through
-                        supervisor allocation and project-topic proposal review.
+                        supervisor allocation, project-topic proposal review and topic similarity assessment.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/register">Student registration <span aria-hidden="true">→</span></Link>

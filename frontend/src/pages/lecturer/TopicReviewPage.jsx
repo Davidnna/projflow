@@ -26,6 +26,10 @@ export default function TopicReviewPage() {
     const [selected, setSelected] = useState(null);
     const [decision, setDecision] = useState("approve");
     const [feedback, setFeedback] = useState("");
+    const [similarityReport, setSimilarityReport] = useState(null);
+    const [similarityLoading, setSimilarityLoading] = useState(false);
+    const [similarityRunning, setSimilarityRunning] = useState(false);
+    const [similarityError, setSimilarityError] = useState("");
 
     const loadTopics = useCallback(async () => {
         setLoading(true);
@@ -40,6 +44,38 @@ export default function TopicReviewPage() {
     }, []);
 
     useEffect(() => { loadTopics(); }, [loadTopics]);
+
+    useEffect(() => {
+        if (!selected?.id || !selected.can_view_similarity) {
+            setSimilarityReport(null);
+            setSimilarityError("");
+            setSimilarityLoading(false);
+            return undefined;
+        }
+
+        let active = true;
+        setSimilarityReport(null);
+        setSimilarityError("");
+        setSimilarityLoading(true);
+        apiRequest(`${endpoints.topics}${selected.id}/similarity-report/`)
+            .then((report) => {
+                if (active) {
+                    setSimilarityReport(report);
+                }
+            })
+            .catch((requestError) => {
+                if (active) {
+                    setSimilarityError(requestError.message);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setSimilarityLoading(false);
+                }
+            });
+
+        return () => { active = false; };
+    }, [selected?.id, selected?.can_view_similarity]);
 
     const visibleTopics = useMemo(() => {
         if (activeFilter === "all") {
@@ -100,6 +136,25 @@ export default function TopicReviewPage() {
     }
 
     const canReview = selected?.can_review === true;
+
+    async function runSimilarityCheck() {
+        if (!selected?.id) {
+            return;
+        }
+        setSimilarityRunning(true);
+        setSimilarityError("");
+        try {
+            const report = await apiRequest(`${endpoints.topics}${selected.id}/run-similarity/`, {
+                method: "POST",
+                timeout: 120000,
+            });
+            setSimilarityReport(report);
+        } catch (requestError) {
+            setSimilarityError(requestError.message);
+        } finally {
+            setSimilarityRunning(false);
+        }
+    }
 
     return (
         <>
@@ -173,6 +228,61 @@ export default function TopicReviewPage() {
                         <div className="topic-keywords">{(selected.keywords || []).map((keyword) => <span key={keyword}>{keyword}</span>)}</div>
                         {selected.revisions?.length > 0 && (
                             <div className="topic-revision-list"><h3>Submission history</h3>{selected.revisions.map((revision) => <div key={revision.id}><strong>Revision {revision.revision_number}</strong><span>{new Date(revision.submitted_at).toLocaleDateString()}</span></div>)}</div>
+                        )}
+                        {selected.can_view_similarity && (
+                            <section className="topic-similarity-panel" aria-live="polite">
+                                <div className="topic-similarity-heading">
+                                    <div>
+                                        <h3>Potentially related previous projects</h3>
+                                        <p>Use these findings as guidance during your academic review. Similarity scores do not establish plagiarism or make an approval decision.</p>
+                                    </div>
+                                </div>
+                                {similarityLoading ? (
+                                    <p className="topic-similarity-message">Checking related project topics…</p>
+                                ) : similarityError ? (
+                                    <div className="topic-similarity-message">
+                                        <p>{similarityError}</p>
+                                        <button type="button" className="button button-secondary" onClick={runSimilarityCheck} disabled={similarityRunning}>
+                                            {similarityRunning ? "Checking…" : "Try again"}
+                                        </button>
+                                    </div>
+                                ) : similarityReport?.status === "completed" ? (
+                                    similarityReport.matches?.length ? (
+                                        <div className="topic-similarity-list">
+                                            {similarityReport.matches.map((match) => (
+                                                <article className="topic-similarity-item" key={match.id}>
+                                                    <div className="topic-similarity-item-heading">
+                                                        <div>
+                                                            <h4>{match.previous_title}</h4>
+                                                            <p>{match.academic_session} · {match.project_status_label}</p>
+                                                        </div>
+                                                        <strong>{match.similarity_percent}%</strong>
+                                                    </div>
+                                                    {match.matched_sections?.length > 0 && (
+                                                        <div className="topic-similarity-sections">
+                                                            {match.matched_sections.map((section) => (
+                                                                <div className="topic-similarity-section" key={section.section}>
+                                                                    <div><strong>{section.section}</strong><span>{section.similarity_percent}%</span></div>
+                                                                    <p>{section.excerpt}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </article>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="topic-similarity-message">No closely related previous project topics were identified.</p>
+                                    )
+                                ) : (
+                                    <div className="topic-similarity-message">
+                                        <p>A similarity review is not available for this proposal yet.</p>
+                                        <button type="button" className="button button-secondary" onClick={runSimilarityCheck} disabled={similarityRunning}>
+                                            {similarityRunning ? "Checking…" : "Run similarity check"}
+                                        </button>
+                                    </div>
+                                )}
+                            </section>
                         )}
                         {selected.reviews?.length > 0 && (
                             <div className="topic-review-history">

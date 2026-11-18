@@ -33,6 +33,11 @@ const capabilities = [
     },
     {
         number: "07",
+        title: "Project topic similarity review",
+        description: "Help supervisors identify proposals that may overlap with topics from previous academic sessions.",
+    },
+    {
+        number: "08",
         title: "Role-based workspaces",
         description: "Give students, lecturers and departmental administrators access to the tools relevant to their responsibilities.",
     },
@@ -46,6 +51,7 @@ const workflow = [
     ["05", "Supervisors are assigned", "The Coordinator assigns verified students and lecturers can view their supervision responsibilities."],
     ["06", "Students submit project topics", "Students send proposals to their assigned supervisor and can revise them in response to feedback."],
     ["07", "Supervisors review proposals", "The assigned supervisor approves, requests a revision or rejects the proposal."],
+    ["08", "Potentially related topics are identified", "The assigned supervisor can review potential matches with previous academic proposals."],
 ];
 
 const audiences = [
@@ -64,6 +70,10 @@ const faqs = [
         answer: "Students should be included in the department's eligible student register. If a record is missing or the submitted details do not match, the registration is referred for staff review.",
     },
     {
+        question: "Who can see topic similarity findings?",
+        answer: "Only the student's currently assigned supervisor can view potential matches and matched sections. Similarity findings are guidance for academic review and do not automatically determine whether a topic is approved.",
+    },
+    {
         question: "Does an academic session need start and end dates?",
         answer: "No. The Project Coordinator creates, activates and closes academic sessions manually. Session changes are not triggered by calendar dates.",
     },
@@ -79,7 +89,7 @@ export default function HomePage() {
                         <h1>Bring your department's project work into <span>one clear process.</span></h1>
                         <p>
                             ProjFlow helps academic departments organise academic sessions, student records,
-                            student registration, supervisor assignments and project-topic review in one place.
+                            student registration, supervisor assignments, project-topic review and topic similarity findings in one place.
                         </p>
                         <div className="public-hero-actions">
                             <Link className="public-button public-button-primary" to="/features">Explore the features <span aria-hidden="true">→</span></Link>
@@ -134,7 +144,7 @@ export default function HomePage() {
                         </div>
                         <p>
                             ProjFlow supports departmental administration and the first stage of academic supervision,
-                            from student onboarding and supervisor allocation to project-topic submission and review.
+                            from student onboarding and supervisor allocation to project-topic submission, review and similarity assessment.
                         </p>
                     </div>
                     <div className="public-capability-grid">
@@ -158,7 +168,7 @@ export default function HomePage() {
                             <div className="public-eyebrow">HOW THE PROCESS WORKS</div>
                             <h2>From departmental setup to project-topic review.</h2>
                         </div>
-                        <p>ProjFlow brings onboarding, supervisor allocation and project-topic review into a consistent departmental workflow.</p>
+                        <p>ProjFlow brings onboarding, supervisor allocation, proposal review and historical topic comparison into a consistent departmental workflow.</p>
                     </div>
                     <div className="public-workflow-grid">
                         {workflow.map(([number, title, description], index) => (

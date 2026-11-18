@@ -164,6 +164,7 @@ export async function apiRequest(path, options = {}) {
         retry = true,
         headers: customHeaders = {},
         signal,
+        timeout = 30000,
     } = options;
     const headers = { Accept: "application/json", ...customHeaders };
     if (body !== undefined && !formData) {
@@ -180,7 +181,7 @@ export async function apiRequest(path, options = {}) {
             headers,
             body: body === undefined ? undefined : formData ? body : JSON.stringify(body),
             cache: "no-store",
-            signal: signal || AbortSignal.timeout(30000),
+            signal: signal || AbortSignal.timeout(timeout),
         });
     } catch (error) {
         if (error.name === "AbortError" || error.name === "TimeoutError") {

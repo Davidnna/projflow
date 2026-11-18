@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.7`
+- **Current release:** `0.3.8`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -103,7 +103,7 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Each submission is retained as a numbered revision, and each supervisor decision is retained with the revision reviewed, reviewer, decision and feedback.
 - Supervisor reassignment transfers responsibility for the student's current proposal to the new supervisor while preserving earlier review records.
 - Student and lecturer workspaces include project-topic submission and topic-review pages.
-- Topic records retain all submitted proposals and statuses for the historical comparison feature planned in the next increment. Automated topic similarity detection is not included in this release.
+- Topic records retain all submitted proposals and statuses for comparison across academic sessions.
 
 ### Implemented in 0.3.7 (supervisor topic register)
 
@@ -113,11 +113,24 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - The existing review queue remains limited to current submissions awaiting a supervisor decision.
 - Added API tests for approved-topic visibility, historical reviewer access after reassignment, supervisor isolation and Coordinator access restrictions.
 
+### Implemented in 0.3.8 (historical topic similarity detection)
+
+- Added a local hybrid keyword and semantic similarity engine using FastEmbed with the `sentence-transformers/all-MiniLM-L6-v2` ONNX model. No external AI API is called.
+- Compares a submitted proposal's title, abstract, problem statement, research objectives and keywords with the latest revision of each other student's historical proposal across all academic sessions, regardless of the historical proposal's status.
+- Excludes the submitting student's own historical proposals from duplicate-topic comparisons.
+- Combines semantic cosine similarity (70%) with lexical term/phrase overlap (30%) for each field. Overall field weights are title 25%, abstract 20%, problem statement 25%, research objectives 20% and keywords 10%.
+- Uses a fixed system threshold of 62% for potential matches. Field sections scoring at least 50% are included as matched-section evidence.
+- Stores embeddings against proposal revisions and stores only above-threshold matches for each analysed revision. Historical revision embeddings are generated lazily when first needed.
+- Runs analysis after submission and resubmission. A supervisor can retry a check if it was unavailable.
+- Exposes similarity reports only to the currently assigned supervisor. Students, Project Coordinators, Administrators and previous supervisors cannot access the report endpoint.
+- Reports show the historical title, academic session, project status, overall score and short excerpts from matched sections. Full historical proposal documents are not exposed.
+- Similarity scores are advisory indicators, not proof of plagiarism and not automatic approval/rejection decisions.
+- The Render build prepares the model cache before deployment; `.model_cache/` is excluded from Git.
+
 ### Not implemented yet
 
 The following modules are planned for later development and must not be treated as operational features in this release:
 
-- Historical topic similarity comparison using the approved local hybrid keyword and semantic analysis approach.
 - Chapter and final-project submissions, private Supabase Storage integration and annotated feedback.
 - Coordinator-defined project milestones, progress reports, deadlines and extension requests.
 - Final-project recommendation and departmental defence clearance.
@@ -136,6 +149,7 @@ The following modules are planned for later development and must not be treated 
 | Database | Supabase PostgreSQL | Accounts, academic records, workflow state and audit history |
 | Local database fallback | SQLite | Local development and automated tests when `DATABASE_URL` is absent |
 | Spreadsheet import | openpyxl and Python CSV | XLSX and CSV roster parsing |
+| Local NLP inference | FastEmbed 0.9.1, ONNX Runtime and `sentence-transformers/all-MiniLM-L6-v2` | Local semantic embeddings for project-topic similarity; no external AI API |
 | Backend hosting | Render | Django API and application services |
 | Frontend hosting | Cloudflare Pages | Static React application |
 | Source control and CI | GitHub and GitHub Actions | Version control, automated tests and production builds |
@@ -341,8 +355,12 @@ Student registration requires an active academic session. Passwords must be at l
 | `GET` | `/api/projects/topics/{id}/` | Retrieve an accessible proposal and its revision/review history |
 | `POST` | `/api/projects/topics/{id}/resubmit/` | Resubmit a proposal after a supervisor requests revision |
 | `POST` | `/api/projects/topics/{id}/review/` | Approve, request revision or reject (currently assigned supervisor only) |
+| `GET` | `/api/projects/topics/{id}/similarity-report/` | Retrieve historical topic similarity findings (currently assigned supervisor only) |
+| `POST` | `/api/projects/topics/{id}/run-similarity/` | Run or retry similarity analysis (currently assigned supervisor only) |
 
 A proposal requires a title, abstract, problem statement, research objectives and at least one keyword. A student must have a verified enrolment in the active session and a current supervisor assignment before submitting. A revision request or rejection must include supervisor feedback. Each submission is saved as a numbered revision. A rejected proposal remains in the historical record and no longer blocks a new proposal. A student may have only one current proposal per enrolment. Reassigning a supervisor transfers the current proposal to the new supervisor; earlier review records remain linked to the supervisor who made each decision.
+
+Similarity analysis runs after each new submission or resubmission. It compares the five proposal elements against the latest revision of each other student's topic across current and previous academic sessions, including approved and rejected topics. The engine combines local semantic embeddings and lexical term/phrase matching. The fixed threshold is 62%; only matches at or above that threshold are retained. The supervisor-only report includes the previous topic title, academic session, status, overall similarity score and relevant matched-section excerpts. Similarity scores are advisory and do not make academic decisions. If a proposal predates this feature or an analysis was unavailable, the currently assigned supervisor can run the check from the proposal detail view.
 
 ## 7. Data model introduced across releases
 
@@ -358,6 +376,8 @@ A proposal requires a title, abstract, problem statement, research objectives an
 | `ProjectTopic` | Student proposal, current supervisor responsibility and workflow status; one current proposal per enrolment |
 | `ProjectTopicRevision` | Immutable numbered snapshots of each student submission |
 | `ProjectTopicReview` | Supervisor decision and feedback linked to the exact revision reviewed |
+| `ProjectTopicSimilarity` | Above-threshold historical match, field-level scores, threshold and model/algorithm version; visible only through the assigned-supervisor report endpoint |
+| `ProjectTopicRevision.similarity_embeddings` | Private per-field semantic vectors cached for repeat comparisons; never included in API serializers |
 | `User`, `Role`, `UserRole` | Existing UUID-based account model, global roles and role assignments |
 
 Sensitive changes are performed through transactional service functions. Academic session, roster, enrolment and assignment records are retained rather than silently overwritten.
@@ -371,6 +391,7 @@ Sensitive changes are performed through transactional service functions. Academi
 - Student registration records are restricted according to role and relationship.
 - Lecturer profile deactivation prevents new supervisor allocations while retaining the user account and historical assignments; this avoids disabling a user who may hold another global role.
 - Roster imports are validated before commit and have a 10 MB/5,000-row limit.
+- Similarity embeddings and match records are internal academic-review data. They are not returned to student or Coordinator endpoints; the similarity report is authorised only for the currently assigned supervisor.
 - Future academic document storage will use private Supabase Storage buckets. PostgreSQL will store metadata and object references, not document binaries. Django will authorise every upload/download and issue short-lived access links. Access is limited to the student, their assigned supervisor, the Project Coordinator and examination panel members assigned to that student.
 - Future project submissions will have one mandatory primary document and up to five optional supporting files. Each file will be limited to 20 MB. Permitted formats will be fixed by the system for each submission category and cannot be changed through the user interface: proposals/chapters/revisions/annotated feedback/final reports accept PDF, DOC and DOCX; defence presentations accept PPTX and PDF; supplementary materials accept PDF, DOC, DOCX, XLSX, JPG, JPEG and PNG.
 - Real student records, project documents, credentials and examination data must never be committed to this repository.
@@ -423,6 +444,14 @@ Install dependencies:
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
+
+Prepare the local semantic model once before testing topic similarity:
+
+```bash
+python manage.py warm_topic_similarity_model
+```
+
+This downloads the public model into `backend/.model_cache/`. The model runs locally through ONNX Runtime; the first preparation requires an internet connection. Render performs the same preparation during its build step.
 
 Set the environment variables before running Django.
 

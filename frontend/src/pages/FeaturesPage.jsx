@@ -63,6 +63,16 @@ const featureGroups = [
     },
     {
         number: "07",
+        title: "Project topic similarity review",
+        intro: "Help supervisors identify proposals that may overlap with work submitted in previous academic sessions.",
+        points: [
+            "Compare project titles, abstracts, problem statements, research objectives and keywords.",
+            "Combine keyword matching with meaning-based comparison to identify potentially related proposals.",
+            "Show potential matches and relevant sections to the assigned supervisor only; academic decisions remain with the supervisor.",
+        ],
+    },
+    {
+        number: "08",
         title: "Role-based workspaces",
         intro: "Present relevant information and actions according to each person's role.",
         points: [
@@ -81,8 +91,8 @@ export default function FeaturesPage() {
                     <div className="public-eyebrow">PROJFLOW FEATURES</div>
                     <h1>The essential tools for organised project administration.</h1>
                     <p>
-                        ProjFlow brings together academic sessions, student onboarding, supervisor allocation
-                        and the project-topic proposal and review process.
+                        ProjFlow brings together academic sessions, student onboarding, supervisor allocation,
+                        project-topic review and historical topic similarity checks.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
@@ -109,7 +119,7 @@ export default function FeaturesPage() {
                     </div>
                     <p className="public-feature-note">
                         ProjFlow's available features cover academic administration, student onboarding, supervisor
-                        coordination and project-topic review. Access to each workspace depends on the user's role.
+                        coordination, project-topic review and supervisor-only similarity findings. Access to each workspace depends on the user's role.
                     </p>
                 </div>
             </section>

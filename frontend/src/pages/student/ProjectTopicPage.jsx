@@ -151,10 +151,18 @@ export default function ProjectTopicPage() {
         try {
             const payload = toPayload(form);
             if (editingTopic) {
-                await apiRequest(`${endpoints.topics}${editingTopic.id}/resubmit/`, { method: "POST", body: payload });
+                await apiRequest(`${endpoints.topics}${editingTopic.id}/resubmit/`, {
+                    method: "POST",
+                    body: payload,
+                    timeout: 120000,
+                });
                 setSuccess("Your revised project topic has been submitted to your supervisor.");
             } else {
-                await apiRequest(endpoints.topics, { method: "POST", body: payload });
+                await apiRequest(endpoints.topics, {
+                    method: "POST",
+                    body: payload,
+                    timeout: 120000,
+                });
                 setSuccess("Your project topic has been submitted to your supervisor.");
             }
             setEditingTopic(null);

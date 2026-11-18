@@ -7,7 +7,7 @@ services:
         region: frankfurt
         branch: main
         rootDir: backend
-        buildCommand: pip install -r requirements.txt && python manage.py check && python manage.py collectstatic --noinput
+        buildCommand: pip install -r requirements.txt && python manage.py warm_topic_similarity_model && python manage.py check && python manage.py collectstatic --noinput
         startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
         healthCheckPath: /api/health/
         autoDeployTrigger: checksPass

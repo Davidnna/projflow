@@ -25,7 +25,7 @@ export default function PlatformPage() {
                     <p>
                         ProjFlow is a web-based final-year project management platform for academic departments.
                         It brings together academic session management, student onboarding, lecturer records,
-                        supervisor allocation and project-topic proposal review.
+                        supervisor allocation, project-topic proposal review and historical topic similarity assessment.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/features">Explore platform features <span aria-hidden="true">→</span></Link>
@@ -90,6 +90,7 @@ export default function PlatformPage() {
                         <div><span>✓</span><p>Student records can be entered individually or imported in a spreadsheet.</p></div>
                         <div><span>✓</span><p>Verified students can be assigned to a project supervisor.</p></div>
                         <div><span>✓</span><p>Students submit proposals to their assigned supervisor for review and approval.</p></div>
+                        <div><span>✓</span><p>Supervisors can review potential similarities with proposals from previous academic sessions.</p></div>
                     </div>
                 </div>
             </section>

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -13,8 +14,10 @@ from .serializers import (
     ProjectTopicReviewActionSerializer,
     ProjectTopicSerializer,
     ProjectTopicSubmissionSerializer,
+    ProjectTopicSimilaritySerializer,
 )
 from .services import review_project_topic, resubmit_project_topic, submit_project_topic
+from .similarity import SIMILARITY_THRESHOLD, analyse_topic_similarity
 
 
 def raise_api_validation_error(exc):
@@ -63,6 +66,9 @@ class ProjectTopicViewSet(viewsets.ModelViewSet):
             topic = submit_project_topic(actor=request.user, data=serializer.validated_data)
         except DjangoValidationError as exc:
             raise_api_validation_error(exc)
+        transaction.on_commit(
+            lambda topic_id=topic.pk: analyse_topic_similarity(topic_id)
+        )
         output = ProjectTopicSerializer(topic, context=self.get_serializer_context())
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -110,7 +116,70 @@ class ProjectTopicViewSet(viewsets.ModelViewSet):
             )
         except DjangoValidationError as exc:
             raise_api_validation_error(exc)
+        transaction.on_commit(
+            lambda topic_id=topic.pk: analyse_topic_similarity(topic_id)
+        )
         return Response(ProjectTopicSerializer(topic, context=self.get_serializer_context()).data)
+
+    def _require_current_supervisor(self, topic, user):
+        assignment = topic.supervisor_assignment
+        if (
+            user.is_superuser
+            or user.has_role(RoleCode.ADMINISTRATOR)
+            or user.has_role(RoleCode.PROJECT_COORDINATOR)
+            or not user.has_role(RoleCode.LECTURER)
+            or not assignment.is_current
+            or assignment.lecturer.user_id != user.id
+        ):
+            raise PermissionDenied("This information is available to the assigned supervisor only.")
+
+    def _similarity_report_response(self, revision):
+        from .models import ProjectTopicSimilarity
+
+        matches = ProjectTopicSimilarity.objects.filter(
+            source_revision=revision
+        ).select_related(
+            "matched_revision__topic__student_enrollment__session"
+        )
+        return Response(
+            {
+                "status": revision.similarity_status,
+                "analysed_at": revision.similarity_analyzed_at,
+                "threshold_percent": round(SIMILARITY_THRESHOLD * 100),
+                "matches": ProjectTopicSimilaritySerializer(matches, many=True).data,
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="similarity-report")
+    def similarity_report(self, request, pk=None):
+        if (
+            request.user.is_superuser
+            or request.user.has_role(RoleCode.ADMINISTRATOR)
+            or request.user.has_role(RoleCode.PROJECT_COORDINATOR)
+            or not request.user.has_role(RoleCode.LECTURER)
+        ):
+            raise PermissionDenied("This information is available to supervisors only.")
+        topic = self.get_object()
+        self._require_current_supervisor(topic, request.user)
+        revision = topic.revisions.order_by("-revision_number").first()
+        if revision is None:
+            raise ValidationError("The proposal history could not be found.")
+        return self._similarity_report_response(revision)
+
+    @action(detail=True, methods=["post"], url_path="run-similarity")
+    def run_similarity(self, request, pk=None):
+        if (
+            request.user.is_superuser
+            or request.user.has_role(RoleCode.ADMINISTRATOR)
+            or request.user.has_role(RoleCode.PROJECT_COORDINATOR)
+            or not request.user.has_role(RoleCode.LECTURER)
+        ):
+            raise PermissionDenied("This action is available to supervisors only.")
+        topic = self.get_object()
+        self._require_current_supervisor(topic, request.user)
+        analyse_topic_similarity(topic.pk, force=True)
+        revision = topic.revisions.order_by("-revision_number").first()
+        return self._similarity_report_response(revision)
 
     @action(detail=True, methods=["post"])
     def review(self, request, pk=None):
