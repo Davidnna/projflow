@@ -6,11 +6,13 @@ import BrandLogo from "../BrandLogo.jsx";
 const lecturerLinks = [
     { to: "/app/overview", label: "Overview", icon: "◫", end: true },
     { to: "/app/topics/review", label: "Topic reviews", icon: "✎" },
+    { to: "/app/progress", label: "Student progress", icon: "◷" },
 ];
 
 const studentLinks = [
     { to: "/app/overview", label: "Overview", icon: "◫", end: true },
     { to: "/app/topics", label: "My project topic", icon: "✎" },
+    { to: "/app/my-progress", label: "Project progress", icon: "◷" },
 ];
 
 const coordinatorLinks = [
@@ -20,6 +22,7 @@ const coordinatorLinks = [
     { to: "/app/registrations", label: "Registrations", icon: "✓" },
     { to: "/app/lecturers", label: "Lecturers", icon: "♧" },
     { to: "/app/supervisors", label: "Supervisor allocation", icon: "⇄" },
+    { to: "/app/milestones", label: "Project milestones", icon: "⚑" },
 ];
 
 export default function DashboardLayout() {
@@ -27,9 +30,13 @@ export default function DashboardLayout() {
     const [menuOpen, setMenuOpen] = useState(false);
     const navigate = useNavigate();
     const isCoordinator = hasAnyRole(["administrator", "project_coordinator"]);
+    const isProjectCoordinator = hasAnyRole(["project_coordinator"]);
     const isLecturer = hasAnyRole(["lecturer"]);
+    const visibleCoordinatorLinks = coordinatorLinks.filter(
+        (link) => link.to !== "/app/milestones" || isProjectCoordinator,
+    );
     const links = [
-        ...(isCoordinator ? coordinatorLinks : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }]),
+        ...(isCoordinator ? visibleCoordinatorLinks : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }]),
         ...(isLecturer && isCoordinator ? lecturerLinks.slice(1) : isLecturer ? lecturerLinks.slice(1) : []),
         ...(hasAnyRole(["student"]) ? studentLinks.slice(1) : []),
     ];

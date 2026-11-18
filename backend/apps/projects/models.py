@@ -188,3 +188,191 @@ class ProjectTopicSimilarity(models.Model):
 
     def __str__(self):
         return f"{self.source_revision_id} -> {self.matched_revision_id} ({self.overall_score:.3f})"
+
+
+class ProjectMilestone(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        "academics.AcademicSession",
+        on_delete=models.PROTECT,
+        related_name="project_milestones",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    expected_achievement = models.TextField(blank=True)
+    sequence = models.PositiveIntegerField()
+    due_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_milestones_created",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_milestones_updated",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "projects_project_milestone"
+        ordering = ["session__created_at", "sequence", "title"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "sequence"],
+                name="projects_unique_session_milestone_order",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["session", "is_active", "sequence"],
+                name="projects_milestone_session_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.session.name}: {self.sequence}. {self.title}"
+
+
+class ProgressReportStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    REVISION_REQUESTED = "revision_requested", "Revision requested"
+    REVIEWED = "reviewed", "Reviewed"
+
+
+class ProgressReviewDecision(models.TextChoices):
+    REVIEW = "review", "Reviewed"
+    REQUEST_REVISION = "request_revision", "Request revision"
+
+
+class ProgressAssessment(models.TextChoices):
+    ON_TRACK = "on_track", "On track"
+    NEEDS_ATTENTION = "needs_attention", "Needs attention"
+    BEHIND_SCHEDULE = "behind_schedule", "Behind schedule"
+    COMPLETED = "completed", "Milestone completed"
+
+
+class ProjectProgressReport(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    milestone = models.ForeignKey(
+        ProjectMilestone,
+        on_delete=models.PROTECT,
+        related_name="progress_reports",
+    )
+    student_enrollment = models.ForeignKey(
+        "academics.StudentEnrollment",
+        on_delete=models.PROTECT,
+        related_name="progress_reports",
+    )
+    supervisor_assignment = models.ForeignKey(
+        "academics.SupervisorAssignment",
+        on_delete=models.PROTECT,
+        related_name="progress_reports",
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=ProgressReportStatus.choices,
+        default=ProgressReportStatus.SUBMITTED,
+    )
+    submitted_at = models.DateTimeField(default=timezone.now)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "projects_progress_report"
+        ordering = ["-submitted_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["milestone", "student_enrollment"],
+                name="projects_unique_student_milestone_report",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["student_enrollment", "status"],
+                name="projects_progress_student_idx",
+            ),
+            models.Index(
+                fields=["supervisor_assignment", "status"],
+                name="projects_prog_supervisor_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student_enrollment.matric_number}: {self.milestone.title}"
+
+
+class ProjectProgressRevision(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    report = models.ForeignKey(
+        ProjectProgressReport,
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    revision_number = models.PositiveIntegerField()
+    completed_activities = models.TextField()
+    challenges = models.TextField(blank=True)
+    next_steps = models.TextField(blank=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_progress_revisions",
+    )
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "projects_progress_revision"
+        ordering = ["revision_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["report", "revision_number"],
+                name="projects_unique_progress_revision",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.report_id} revision {self.revision_number}"
+
+
+class ProjectProgressReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    report = models.ForeignKey(
+        ProjectProgressReport,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    revision = models.ForeignKey(
+        ProjectProgressRevision,
+        on_delete=models.PROTECT,
+        related_name="reviews",
+    )
+    supervisor_assignment = models.ForeignKey(
+        "academics.SupervisorAssignment",
+        on_delete=models.PROTECT,
+        related_name="project_progress_reviews",
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_progress_reviews",
+    )
+    decision = models.CharField(max_length=24, choices=ProgressReviewDecision.choices)
+    assessment = models.CharField(max_length=24, choices=ProgressAssessment.choices)
+    feedback = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "projects_progress_review"
+        ordering = ["-reviewed_at"]
+        indexes = [
+            models.Index(
+                fields=["report", "reviewed_at"],
+                name="projects_progress_review_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.report_id}: {self.get_assessment_display()}"

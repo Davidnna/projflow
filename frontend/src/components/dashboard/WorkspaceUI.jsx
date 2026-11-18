@@ -36,15 +36,17 @@ export function StatusBadge({ value, children }) {
         duplicate: "Duplicate",
         inactive: "Inactive",
         approved: "Approved",
+        reviewed: "Reviewed",
+        not_submitted: "Awaiting report",
         submitted: "Awaiting review",
         revision_requested: "Revision requested",
         pending: "Pending",
     };
     const fallback = String(value || "Unknown").replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
     const label = children || labels[value] || fallback;
-    const tone = ["active", "auto_verified", "manually_approved", "committed", "approved", "valid"].includes(value)
+    const tone = ["active", "auto_verified", "manually_approved", "committed", "approved", "reviewed", "valid", "completed"].includes(value)
         ? "success"
-        : ["pending_review", "planned", "previewed", "pending", "invalid", "duplicate", "submitted", "revision_requested"].includes(value)
+        : ["pending_review", "planned", "previewed", "pending", "invalid", "duplicate", "submitted", "revision_requested", "not_submitted"].includes(value)
             ? "warning"
             : ["closed", "rejected", "inactive"].includes(value) ? "muted" : "info";
     return <span className={`state-badge state-badge--${tone}`}>{label}</span>;

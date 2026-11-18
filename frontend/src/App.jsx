@@ -16,6 +16,9 @@ import LecturersPage from "./pages/coordinator/LecturersPage.jsx";
 import SupervisorsPage from "./pages/coordinator/SupervisorsPage.jsx";
 import ProjectTopicPage from "./pages/student/ProjectTopicPage.jsx";
 import TopicReviewPage from "./pages/lecturer/TopicReviewPage.jsx";
+import ProgressReviewPage from "./pages/lecturer/ProgressReviewPage.jsx";
+import MilestonesPage from "./pages/coordinator/MilestonesPage.jsx";
+import ProgressPage from "./pages/student/ProgressPage.jsx";
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
 
@@ -42,6 +45,13 @@ export default function App() {
                     </Route>
                     <Route element={<ProtectedRoute roles={["lecturer"]} />}>
                         <Route path="topics/review" element={<TopicReviewPage />} />
+                        <Route path="progress" element={<ProgressReviewPage />} />
+                    </Route>
+                    <Route element={<ProtectedRoute roles={["student"]} />}>
+                        <Route path="my-progress" element={<ProgressPage />} />
+                    </Route>
+                    <Route element={<ProtectedRoute roles={["project_coordinator"]} />}>
+                        <Route path="milestones" element={<MilestonesPage />} />
                     </Route>
                     <Route element={<ProtectedRoute roles={coordinatorRoles} />}>
                         <Route path="sessions" element={<SessionsPage />} />

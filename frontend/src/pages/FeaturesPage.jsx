@@ -73,6 +73,17 @@ const featureGroups = [
     },
     {
         number: "08",
+        title: "Project milestones and progress monitoring",
+        intro: "Keep project work moving through common departmental milestones and supervisor feedback.",
+        points: [
+            "The Project Coordinator defines the milestone structure for each academic session.",
+            "Students submit progress reports describing completed activities, challenges and next steps.",
+            "Supervisors review reports, provide feedback and record progress assessments.",
+            "Submission and assessment history remains available to the student and assigned supervisor.",
+        ],
+    },
+    {
+        number: "09",
         title: "Role-based workspaces",
         intro: "Present relevant information and actions according to each person's role.",
         points: [
@@ -92,7 +103,7 @@ export default function FeaturesPage() {
                     <h1>The essential tools for organised project administration.</h1>
                     <p>
                         ProjFlow brings together academic sessions, student onboarding, supervisor allocation,
-                        project-topic review and historical topic similarity checks.
+                        project-topic review, historical topic similarity checks and milestone-based progress monitoring.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
@@ -119,7 +130,7 @@ export default function FeaturesPage() {
                     </div>
                     <p className="public-feature-note">
                         ProjFlow's available features cover academic administration, student onboarding, supervisor
-                        coordination, project-topic review and supervisor-only similarity findings. Access to each workspace depends on the user's role.
+                        coordination, project-topic review, supervisor-only similarity findings and milestone-based progress monitoring. Access to each workspace depends on the user's role.
                     </p>
                 </div>
             </section>

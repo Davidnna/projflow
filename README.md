@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.8`
+- **Current release:** `0.3.9`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation. Release `0.3.9` adds Coordinator-defined session milestones, student progress reports, supervisor assessments, revision requests and report history.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -127,12 +127,24 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Similarity scores are advisory indicators, not proof of plagiarism and not automatic approval/rejection decisions.
 - The Render build prepares the model cache before deployment; `.model_cache/` is excluded from Git.
 
+
+### Implemented in 0.3.9 (milestones and progress monitoring)
+
+- The Project Coordinator defines a common ordered milestone structure for each academic session; supervisors cannot add or modify individual student milestones.
+- Milestones contain a title, description, expected achievement, sequence number and optional due date. Academic session start/end dates remain unnecessary; milestone due dates are independently optional.
+- Students with verified enrolment and a current supervisor submit one progress report per milestone, describing completed activities, challenges and next steps.
+- The assigned supervisor reviews each report, records an assessment (on track, needs attention, behind schedule or milestone completed), and provides feedback. A supervisor can request a revision; revision requests require feedback.
+- Students can resubmit a report when revision is requested. Numbered report revisions and supervisor assessment history are retained.
+- Students can access only their own milestones and progress reports. Lecturers can access reports for their currently assigned students and records they previously reviewed. Coordinators manage milestone definitions but do not access individual progress report content through the progress-report API.
+- Milestones with existing reports cannot have their session, order, title or expected achievement structure changed. They can be deactivated while their historical records remain available.
+- Student, supervisor and Coordinator workspaces include role-specific progress and milestone pages.
+
 ### Not implemented yet
 
 The following modules are planned for later development and must not be treated as operational features in this release:
 
-- Chapter and final-project submissions, private Supabase Storage integration and annotated feedback.
-- Coordinator-defined project milestones, progress reports, deadlines and extension requests.
+- Chapter and final-project submissions, private Supabase Storage integration, progress-report supporting-file uploads and annotated feedback.
+- Session-specific project deadlines and extension requests.
 - Final-project recommendation and departmental defence clearance.
 - Examination panels, defence scheduling and supervisor conflict-of-interest checks.
 - Supervisor-configured assessment templates, examiner scoring, result approval, publication and appeals.
@@ -230,14 +242,21 @@ The Coordinator can approve or reject a registration requiring manual review. Re
 - Students can submit chapters in any order; chapter approval is not a prerequisite for submitting another chapter.
 - Supervisors provide both written feedback and annotated document uploads.
 
-### 5.4 Progress monitoring (planned)
+### 5.4 Milestones and progress monitoring (implemented in 0.3.9)
 
-- The Project Coordinator defines one common milestone structure for all students in each academic session.
-- Supervisors cannot add individual milestones.
-- Students submit progress reports at milestone points. Supervisors review reports, comment and assess progress.
+- The Project Coordinator defines one common ordered milestone structure for all students in each academic session. Supervisors cannot add individual milestones.
+- Each milestone includes a title, description, expected achievement and sequence number. A due date may be configured independently; academic session start and end dates are not required.
+- Students with verified enrolment and an assigned supervisor submit a progress report for each milestone. A report describes completed activities, challenges encountered and planned next steps.
+- The assigned supervisor reviews each report, records an assessment (on track, needs attention, behind schedule or milestone completed) and provides feedback. The supervisor may request a revision with mandatory feedback.
+- Students can resubmit reports when revisions are requested. Numbered report revisions and supervisor review history are retained.
+- Progress reports currently contain text fields only. Supporting-file uploads are deferred until private persistent document storage is integrated; Render's ephemeral filesystem is not used for student documents.
+- Students see their own reports and feedback. Supervisors see reports for their assigned students and historical reports they reviewed. The Coordinator manages the common milestone structure but does not access individual progress report content through the progress-report API.
+
+### 5.5 Project deadlines and extensions (planned)
+
 - The Project Coordinator sets project-topic, chapter, final-submission and defence-related deadlines for each session. Students may request individual extensions before or after the original deadline, with a mandatory justification and proposed new date. The Coordinator approves or rejects each request; a request does not itself change the deadline.
 
-### 5.5 Final submission, defence and results (planned)
+### 5.6 Final submission, defence and results (planned)
 
 1. The student submits the complete project to the supervisor.
 2. The supervisor recommends or declines to recommend the student for defence.
@@ -286,7 +305,7 @@ Academic sessions are created with a name only. Start and end dates are not requ
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/academics/sessions/` | List sessions |
-| `POST` | `/api/academics/sessions/` | Create a planned session (Coordinator/Administrator) |
+| `POST` | `/api/academics/sessions/` | Create a planned session (Project Coordinator only) |
 | `GET` | `/api/academics/sessions/{id}/` | Retrieve a session |
 | `PATCH` | `/api/academics/sessions/{id}/` | Update planned-session details |
 | `POST` | `/api/academics/sessions/{id}/activate/` | Activate a planned session |
@@ -298,7 +317,7 @@ A second session cannot be activated until the current active session is closed.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `GET` | `/api/academics/roster/` | List roster records (Coordinator/Administrator) |
+| `GET` | `/api/academics/roster/` | List roster records (Project Coordinator only) |
 | `POST` | `/api/academics/roster/` | Add a student record manually |
 | `GET` | `/api/academics/roster/{id}/` | Retrieve a roster record |
 | `PATCH` | `/api/academics/roster/{id}/` | Update a roster record |
@@ -326,7 +345,7 @@ Imports are previewed before records are created. Invalid rows and duplicates ar
 | `POST` | `/api/auth/register/` | Create a student account and active-session enrolment |
 | `GET` | `/api/academics/enrollments/` | List enrolments according to role and relationship |
 | `GET` | `/api/academics/enrollments/mine/` | Retrieve the authenticated student's registration status |
-| `POST` | `/api/academics/enrollments/{id}/review/` | Approve or reject a pending registration (Coordinator/Administrator) |
+| `POST` | `/api/academics/enrollments/{id}/review/` | Approve or reject a pending registration (Project Coordinator only) |
 
 Student registration requires an active academic session. Passwords must be at least 12 characters and pass Django's configured password validators. A student cannot register the same matriculation number twice in one session. The React registration interface is available in release 0.3.0. After submission, the student receives the registration status and can sign in to monitor verification.
 
@@ -335,14 +354,14 @@ Student registration requires an active academic session. Passwords must be at l
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/academics/lecturers/` | List lecturer profiles for authorised users |
-| `POST` | `/api/academics/lecturers/` | Create lecturer account and profile (Coordinator/Administrator) |
+| `POST` | `/api/academics/lecturers/` | Create lecturer account and profile (Project Coordinator only) |
 | `GET` | `/api/academics/lecturers/{id}/` | Retrieve a lecturer profile |
 | `PATCH` | `/api/academics/lecturers/{id}/` | Update profile or active status |
 | `DELETE` | `/api/academics/lecturers/{id}/` | Deactivate lecturer profile (soft deactivation) |
 | `GET` | `/api/academics/lecturer-workloads/` | List active lecturers ordered by active supervisee count |
 | `GET` | `/api/academics/supervisor-assignments/` | View assignment history allowed by role |
-| `POST` | `/api/academics/supervisor-assignments/assign/` | Assign a supervisor (Coordinator/Administrator) |
-| `POST` | `/api/academics/supervisor-assignments/{id}/reassign/` | Reassign with a mandatory reason (Coordinator/Administrator) |
+| `POST` | `/api/academics/supervisor-assignments/assign/` | Assign a supervisor (Project Coordinator only) |
+| `POST` | `/api/academics/supervisor-assignments/{id}/reassign/` | Reassign with a mandatory reason (Project Coordinator only) |
 
 ### Project-topic proposals and supervisor review
 
@@ -362,6 +381,22 @@ A proposal requires a title, abstract, problem statement, research objectives an
 
 Similarity analysis runs after each new submission or resubmission. It compares the five proposal elements against the latest revision of each other student's topic across current and previous academic sessions, including approved and rejected topics. The engine combines local semantic embeddings and lexical term/phrase matching. The fixed threshold is 62%; only matches at or above that threshold are retained. The supervisor-only report includes the previous topic title, academic session, status, overall similarity score and relevant matched-section excerpts. Similarity scores are advisory and do not make academic decisions. If a proposal predates this feature or an analysis was unavailable, the currently assigned supervisor can run the check from the proposal detail view.
 
+
+### Project milestones and progress monitoring
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/projects/milestones/` | List milestones available to the authenticated role/session |
+| `POST` | `/api/projects/milestones/` | Create a session milestone (Project Coordinator only) |
+| `PATCH` | `/api/projects/milestones/{id}/` | Update a milestone or change its availability (Project Coordinator only) |
+| `GET` | `/api/projects/progress-reports/` | List the student's own reports or reports accessible to the assigned supervisor |
+| `POST` | `/api/projects/progress-reports/` | Submit a report for a milestone (verified student with current supervisor) |
+| `GET` | `/api/projects/progress-reports/{id}/` | Retrieve an accessible report and its revision/review history |
+| `POST` | `/api/projects/progress-reports/{id}/resubmit/` | Resubmit after a supervisor requests revision |
+| `POST` | `/api/projects/progress-reports/{id}/review/` | Assess a report or request revision (currently assigned supervisor only) |
+
+A student can submit one report per milestone in their academic session. If a supervisor requests revision, the student can submit a new numbered revision without losing the previous submission or review history. Milestone order is unique within a session. Milestone records are not deleted; the Coordinator can deactivate them. Once a milestone has progress reports, its session, order, title, description and expected achievement cannot be changed, although its optional due date and availability can be updated. Individual report content is not exposed to Coordinator or Administrator progress-report endpoints.
+
 ## 7. Data model introduced across releases
 
 | Entity | Purpose and important integrity rules |
@@ -378,6 +413,10 @@ Similarity analysis runs after each new submission or resubmission. It compares 
 | `ProjectTopicReview` | Supervisor decision and feedback linked to the exact revision reviewed |
 | `ProjectTopicSimilarity` | Above-threshold historical match, field-level scores, threshold and model/algorithm version; visible only through the assigned-supervisor report endpoint |
 | `ProjectTopicRevision.similarity_embeddings` | Private per-field semantic vectors cached for repeat comparisons; never included in API serializers |
+| `ProjectMilestone` | Coordinator-defined common milestone structure for an academic session; unique order per session |
+| `ProjectProgressReport` | One student report per milestone and enrolment, linked to the supervisor assignment |
+| `ProjectProgressRevision` | Numbered snapshots of student progress-report submissions |
+| `ProjectProgressReview` | Supervisor decision, assessment and feedback linked to the exact progress revision reviewed |
 | `User`, `Role`, `UserRole` | Existing UUID-based account model, global roles and role assignments |
 
 Sensitive changes are performed through transactional service functions. Academic session, roster, enrolment and assignment records are retained rather than silently overwritten.

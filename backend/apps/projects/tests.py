@@ -17,6 +17,9 @@ from apps.academics.models import (
 )
 
 from .models import (
+    ProjectMilestone,
+    ProjectProgressReport,
+    ProgressReportStatus,
     ProjectTopic,
     ProjectTopicDecision,
     ProjectTopicRevision,
@@ -651,3 +654,247 @@ class ProjectTopicSimilarityTests(APITestCase):
             ProjectTopicSimilarity.objects.filter(source_revision=source_revision).count(),
             1,
         )
+
+
+class ProjectMilestoneAndProgressAPITests(APITestCase):
+    def setUp(self):
+        self.student = self.create_user("progress.student@example.com", RoleCode.STUDENT)
+        self.lecturer = self.create_user("progress.supervisor@example.com", RoleCode.LECTURER)
+        self.other_lecturer = self.create_user("progress.other@example.com", RoleCode.LECTURER)
+        self.coordinator = self.create_user("progress.coordinator@example.com", RoleCode.PROJECT_COORDINATOR)
+        self.administrator = self.create_user("progress.admin@example.com", RoleCode.ADMINISTRATOR)
+        self.session = AcademicSession.objects.create(
+            name="2027/2028",
+            status=AcademicSessionStatus.ACTIVE,
+        )
+        self.enrollment = StudentEnrollment.objects.create(
+            user=self.student,
+            session=self.session,
+            matric_number="CS/2027/PROGRESS001",
+            verification_status=StudentVerificationStatus.AUTO_VERIFIED,
+            verification_method=VerificationMethod.AUTOMATIC,
+        )
+        self.lecturer_profile = LecturerProfile.objects.create(user=self.lecturer)
+        self.other_lecturer_profile = LecturerProfile.objects.create(user=self.other_lecturer)
+        self.assignment = SupervisorAssignment.objects.create(
+            student_enrollment=self.enrollment,
+            lecturer=self.lecturer_profile,
+            assigned_by=self.coordinator,
+        )
+        self.milestone = ProjectMilestone.objects.create(
+            session=self.session,
+            title="Literature review",
+            description="Review relevant academic literature.",
+            expected_achievement="A documented review of relevant sources.",
+            sequence=1,
+            created_by=self.coordinator,
+            updated_by=self.coordinator,
+        )
+        self.report_payload = {
+            "completed_activities": "Reviewed twelve relevant journal articles and identified the research gap.",
+            "challenges": "Access to two full-text papers was limited.",
+            "next_steps": "Complete the synthesis and prepare the literature review chapter.",
+        }
+
+    def create_user(self, email, role_code):
+        user = User.objects.create_user(
+            email=email,
+            password="Strong-test-password-123",
+            first_name="Progress",
+            last_name="Tester",
+        )
+        role = Role.objects.get(code=role_code)
+        UserRole.objects.create(user=user, role=role)
+        return user
+
+    def submit_report(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/progress-reports/",
+            {"milestone": str(self.milestone.pk), **self.report_payload},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        return ProjectProgressReport.objects.get(pk=response.data["id"])
+
+    def test_coordinator_can_create_milestone_and_students_can_view_session_milestones(self):
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.post(
+            "/api/projects/milestones/",
+            {
+                "session": str(self.session.pk),
+                "title": "System design",
+                "description": "Prepare the system analysis and design.",
+                "expected_achievement": "Approved design specification.",
+                "sequence": 2,
+                "due_date": "2027-04-30",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(self.student)
+        response = self.client.get("/api/projects/milestones/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_only_coordinator_can_create_milestones(self):
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.post(
+            "/api/projects/milestones/",
+            {
+                "session": str(self.session.pk),
+                "title": "System design",
+                "sequence": 2,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_can_submit_progress_report_for_assigned_milestone(self):
+        report = self.submit_report()
+        self.assertEqual(report.status, ProgressReportStatus.SUBMITTED)
+        self.assertEqual(report.revisions.count(), 1)
+        self.assertEqual(report.supervisor_assignment_id, self.assignment.pk)
+
+    def test_student_cannot_submit_without_supervisor(self):
+        self.assignment.is_current = False
+        self.assignment.save(update_fields=["is_current"])
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/progress-reports/",
+            {"milestone": str(self.milestone.pk), **self.report_payload},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_supervisor_can_view_and_review_assigned_student_progress(self):
+        report = self.submit_report()
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.get("/api/projects/progress-reports/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item["id"] for item in response.data], [str(report.pk)])
+
+        review = self.client.post(
+            f"/api/projects/progress-reports/{report.pk}/review/",
+            {
+                "decision": "review",
+                "assessment": "on_track",
+                "feedback": "Progress is satisfactory. Continue with the planned activities.",
+            },
+            format="json",
+        )
+        self.assertEqual(review.status_code, status.HTTP_200_OK)
+        report.refresh_from_db()
+        self.assertEqual(report.status, ProgressReportStatus.REVIEWED)
+        self.assertEqual(report.reviews.count(), 1)
+
+    def test_other_supervisor_cannot_view_or_review_progress_report(self):
+        report = self.submit_report()
+        self.client.force_authenticate(self.other_lecturer)
+        response = self.client.get(f"/api/projects/progress-reports/{report.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        review = self.client.post(
+            f"/api/projects/progress-reports/{report.pk}/review/",
+            {
+                "decision": "review",
+                "assessment": "on_track",
+                "feedback": "Reviewed.",
+            },
+            format="json",
+        )
+        self.assertEqual(review.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_supervisor_can_request_revision_and_student_can_resubmit(self):
+        report = self.submit_report()
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.post(
+            f"/api/projects/progress-reports/{report.pk}/review/",
+            {
+                "decision": "request_revision",
+                "assessment": "needs_attention",
+                "feedback": "Please provide more detail about the research gap.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        report.refresh_from_db()
+        self.assertEqual(report.status, ProgressReportStatus.REVISION_REQUESTED)
+
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            f"/api/projects/progress-reports/{report.pk}/resubmit/",
+            {
+                "completed_activities": "Expanded the review and clarified the research gap.",
+                "challenges": "No significant challenges.",
+                "next_steps": "Prepare the conceptual framework.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        report.refresh_from_db()
+        self.assertEqual(report.status, ProgressReportStatus.SUBMITTED)
+        self.assertEqual(report.revisions.count(), 2)
+        self.assertEqual(report.reviews.count(), 1)
+
+    def test_coordinator_cannot_view_student_progress_reports(self):
+        self.submit_report()
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.get("/api/projects/progress-reports/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_student_cannot_view_another_students_progress_report(self):
+        report = self.submit_report()
+        another_student = self.create_user("progress.other.student@example.com", RoleCode.STUDENT)
+        self.client.force_authenticate(another_student)
+        response = self.client.get(f"/api/projects/progress-reports/{report.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_milestone_sequence_must_be_unique_within_session(self):
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.post(
+            "/api/projects/milestones/",
+            {
+                "session": str(self.session.pk),
+                "title": "System analysis",
+                "sequence": 1,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_progress_report_cannot_be_submitted_for_closed_session(self):
+        self.session.status = AcademicSessionStatus.CLOSED
+        self.session.save(update_fields=["status"])
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/progress-reports/",
+            {"milestone": str(self.milestone.pk), **self.report_payload},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_milestone_structure_is_immutable_after_a_report_is_submitted(self):
+        self.submit_report()
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.patch(
+            f"/api/projects/milestones/{self.milestone.pk}/",
+            {"title": "Revised milestone title"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+    def test_administrator_without_project_coordinator_role_cannot_manage_milestones(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            "/api/projects/milestones/",
+            {
+                "session": str(self.session.pk),
+                "title": "System design",
+                "sequence": 2,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

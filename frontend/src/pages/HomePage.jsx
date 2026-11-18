@@ -38,6 +38,11 @@ const capabilities = [
     },
     {
         number: "08",
+        title: "Project progress monitoring",
+        description: "Coordinate common academic milestones and let students report progress for supervisor review.",
+    },
+    {
+        number: "09",
         title: "Role-based workspaces",
         description: "Give students, lecturers and departmental administrators access to the tools relevant to their responsibilities.",
     },
@@ -52,12 +57,13 @@ const workflow = [
     ["06", "Students submit project topics", "Students send proposals to their assigned supervisor and can revise them in response to feedback."],
     ["07", "Supervisors review proposals", "The assigned supervisor approves, requests a revision or rejects the proposal."],
     ["08", "Potentially related topics are identified", "The assigned supervisor can review potential matches with previous academic proposals."],
+    ["09", "Project progress is monitored", "Students submit reports at the common milestones set by the Coordinator, and supervisors assess progress."],
 ];
 
 const audiences = [
     { title: "Students", description: "Register using your departmental details and access your student workspace." },
-    { title: "Lecturers", description: "View assigned students and review their project-topic proposals." },
-    { title: "Project Coordinators", description: "Manage academic sessions, student records, registrations, lecturer accounts and supervisor assignments." },
+    { title: "Lecturers", description: "Review assigned students' project topics and progress reports, and provide academic feedback." },
+    { title: "Project Coordinators", description: "Manage academic sessions, student records, registrations, lecturer accounts, supervisor assignments and common project milestones." },
 ];
 
 const faqs = [
@@ -89,7 +95,7 @@ export default function HomePage() {
                         <h1>Bring your department's project work into <span>one clear process.</span></h1>
                         <p>
                             ProjFlow helps academic departments organise academic sessions, student records,
-                            student registration, supervisor assignments, project-topic review and topic similarity findings in one place.
+                            student registration, supervisor assignments, project-topic review, topic similarity findings and milestone-based progress monitoring in one place.
                         </p>
                         <div className="public-hero-actions">
                             <Link className="public-button public-button-primary" to="/features">Explore the features <span aria-hidden="true">→</span></Link>
@@ -166,7 +172,7 @@ export default function HomePage() {
                     <div className="public-section-heading public-section-heading-centered">
                         <div>
                             <div className="public-eyebrow">HOW THE PROCESS WORKS</div>
-                            <h2>From departmental setup to project-topic review.</h2>
+                            <h2>From departmental setup to project progress monitoring.</h2>
                         </div>
                         <p>ProjFlow brings onboarding, supervisor allocation, proposal review and historical topic comparison into a consistent departmental workflow.</p>
                     </div>

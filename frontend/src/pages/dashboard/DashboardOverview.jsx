@@ -6,7 +6,7 @@ import { Alert, EmptyState, LoadingState, PageHeader, StatCard, StatusBadge, get
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
 
-function CoordinatorOverview() {
+function CoordinatorOverview({ canManageMilestones }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
 
@@ -19,7 +19,8 @@ function CoordinatorOverview() {
             apiRequest(endpoints.lecturers),
             apiRequest(endpoints.assignments),
             apiRequest(endpoints.lecturerWorkloads),
-        ]).then(([sessions, roster, enrollments, lecturers, assignments, workloads]) => {
+            apiRequest(endpoints.milestones),
+        ]).then(([sessions, roster, enrollments, lecturers, assignments, workloads, milestones]) => {
             if (active) {
                 setData({
                     sessions: getList(sessions),
@@ -28,6 +29,7 @@ function CoordinatorOverview() {
                     lecturers: getList(lecturers),
                     assignments: getList(assignments),
                     workloads: getList(workloads),
+                    milestones: getList(milestones),
                 });
             }
         }).catch((requestError) => {
@@ -85,6 +87,7 @@ function CoordinatorOverview() {
                         <Link to="/app/students" className="action-list-item"><span className="action-list-icon action-icon-blue">♙</span><span><strong>Manage student records</strong><small>Maintain the departmental student register</small></span><b>→</b></Link>
                         <Link to="/app/supervisors" className="action-list-item"><span className="action-list-icon action-icon-teal">⇄</span><span><strong>Allocate supervisors</strong><small>{unassigned.length} students awaiting allocation</small></span><b>→</b></Link>
                         <Link to="/app/lecturers" className="action-list-item"><span className="action-list-icon action-icon-violet">♧</span><span><strong>Manage lecturers</strong><small>Create and maintain lecturer accounts</small></span><b>→</b></Link>
+                        {canManageMilestones && <Link to="/app/milestones" className="action-list-item"><span className="action-list-icon action-icon-blue">⚑</span><span><strong>Set project milestones</strong><small>{data.milestones.filter((item) => activeSession && item.session === activeSession.id).length} milestones in the active session</small></span><b>→</b></Link>}
                     </div>
                 </section>
                 <section className="surface-card dashboard-panel">
@@ -139,7 +142,7 @@ function LecturerOverview() {
                 <StatCard label="Account status" value={profile?.is_active ? "Active" : profile ? "Inactive" : "—"} detail="Lecturer account" icon="♧" tone="teal" />
             </div>
             <section className="surface-card dashboard-table-card">
-                <div className="surface-card-heading"><div><span className="panel-eyebrow">MY STUDENTS</span><h2>Current supervisees</h2></div><Link className="text-link" to="/app/topics/review">Review project topics →</Link></div>
+                <div className="surface-card-heading"><div><span className="panel-eyebrow">MY STUDENTS</span><h2>Current supervisees</h2></div><div className="table-toolbar"><Link className="text-link" to="/app/topics/review">Review topics →</Link><Link className="text-link" to="/app/progress">Review progress →</Link></div></div>
                 {assignments.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Student</th><th>Matriculation no.</th><th>Academic session</th><th>Assigned</th></tr></thead><tbody>{assignments.map((item) => <tr key={item.id}><td><strong>{item.student_name}</strong></td><td>{item.matric_number}</td><td>{item.session_name}</td><td>{new Date(item.assigned_at).toLocaleDateString()}</td></tr>)}</tbody></table></div> : <EmptyState title="No students assigned yet" description="Your assigned students will appear here." />}
             </section>
         </>
@@ -179,7 +182,7 @@ function StudentOverview() {
                     {assignment && <Alert type="success">Your supervisor is {assignment.lecturer_name}.</Alert>}
                 </div>
             ) : <EmptyState title="Registration details unavailable" description="We couldn't retrieve your registration details. Please contact your department for assistance." />}
-            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Submit your proposed topic and follow your supervisor’s feedback.</p><Link className="button button-primary" to="/app/topics">Open my project topic</Link></div>
+            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Submit your proposed topic, follow your supervisor’s feedback and report progress at each project milestone.</p><div className="student-project-actions"><Link className="button button-primary" to="/app/topics">Open my project topic</Link><Link className="text-link" to="/app/my-progress">View project progress →</Link></div></div>
         </>
     );
 }
@@ -187,7 +190,7 @@ function StudentOverview() {
 export default function DashboardOverview() {
     const { hasAnyRole } = useAuth();
     if (hasAnyRole(coordinatorRoles)) {
-        return <CoordinatorOverview />;
+        return <CoordinatorOverview canManageMilestones={hasAnyRole(["project_coordinator"])} />;
     }
     if (hasAnyRole(["lecturer"])) {
         return <LecturerOverview />;
