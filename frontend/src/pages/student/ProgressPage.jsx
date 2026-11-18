@@ -86,6 +86,7 @@ export default function ProgressPage() {
         () => milestones.filter((item) => item.session_name === enrollment?.session_name).sort((a, b) => a.sequence - b.sequence),
         [milestones, enrollment?.session_name],
     );
+    const sessionActive = sessionMilestones.some((item) => item.session_status === "active");
     const sessionReports = useMemo(
         () => reports.filter((item) => item.session_name === enrollment?.session_name),
         [reports, enrollment?.session_name],
@@ -171,8 +172,8 @@ export default function ProgressPage() {
                     <div className="progress-milestone-list">
                         {sessionMilestones.map((milestone) => {
                             const report = reportsByMilestone.get(milestone.id);
-                            const canSubmit = Boolean(verified && assignment && milestone.is_active && !report);
-                            const canRevise = Boolean(assignment && milestone.is_active && report?.can_resubmit);
+                            const canSubmit = Boolean(verified && assignment && sessionActive && milestone.is_active && !report);
+                            const canRevise = Boolean(sessionActive && assignment && milestone.is_active && report?.can_resubmit);
                             const latest = report?.latest_revision;
                             return (
                                 <article className="surface-card progress-milestone-card" key={milestone.id}>
