@@ -3,6 +3,16 @@ import { useState } from "react";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import BrandLogo from "../BrandLogo.jsx";
 
+const lecturerLinks = [
+    { to: "/app/overview", label: "Overview", icon: "◫", end: true },
+    { to: "/app/topics/review", label: "Topic reviews", icon: "✎" },
+];
+
+const studentLinks = [
+    { to: "/app/overview", label: "Overview", icon: "◫", end: true },
+    { to: "/app/topics", label: "My project topic", icon: "✎" },
+];
+
 const coordinatorLinks = [
     { to: "/app/overview", label: "Overview", icon: "◫", end: true },
     { to: "/app/sessions", label: "Academic sessions", icon: "▦" },
@@ -18,9 +28,11 @@ export default function DashboardLayout() {
     const navigate = useNavigate();
     const isCoordinator = hasAnyRole(["administrator", "project_coordinator"]);
     const isLecturer = hasAnyRole(["lecturer"]);
-    const links = isCoordinator
-        ? coordinatorLinks
-        : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }];
+    const links = [
+        ...(isCoordinator ? coordinatorLinks : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }]),
+        ...(isLecturer && isCoordinator ? lecturerLinks.slice(1) : isLecturer ? lecturerLinks.slice(1) : []),
+        ...(hasAnyRole(["student"]) ? studentLinks.slice(1) : []),
+    ];
 
     async function handleLogout() {
         await logout();

@@ -28,6 +28,11 @@ const capabilities = [
     },
     {
         number: "06",
+        title: "Project topic review",
+        description: "Students submit proposals to their assigned supervisor, receive feedback and resubmit when revisions are requested.",
+    },
+    {
+        number: "07",
         title: "Role-based workspaces",
         description: "Give students, lecturers and departmental administrators access to the tools relevant to their responsibilities.",
     },
@@ -39,11 +44,13 @@ const workflow = [
     ["03", "Students register", "Students submit their details through the public registration page."],
     ["04", "Details are checked", "Matching eligible records are verified automatically. Exceptions are referred for staff review."],
     ["05", "Supervisors are assigned", "The Coordinator assigns verified students and lecturers can view their supervision responsibilities."],
+    ["06", "Students submit project topics", "Students send proposals to their assigned supervisor and can revise them in response to feedback."],
+    ["07", "Supervisors review proposals", "The assigned supervisor approves, requests a revision or rejects the proposal."],
 ];
 
 const audiences = [
     { title: "Students", description: "Register using your departmental details and access your student workspace." },
-    { title: "Lecturers", description: "View your assigned students and the supervision responsibilities recorded for you." },
+    { title: "Lecturers", description: "View assigned students and review their project-topic proposals." },
     { title: "Project Coordinators", description: "Manage academic sessions, student records, registrations, lecturer accounts and supervisor assignments." },
 ];
 
@@ -72,7 +79,7 @@ export default function HomePage() {
                         <h1>Bring your department's project work into <span>one clear process.</span></h1>
                         <p>
                             ProjFlow helps academic departments organise academic sessions, student records,
-                            student registration, lecturer information and supervisor assignments in one place.
+                            student registration, supervisor assignments and project-topic review in one place.
                         </p>
                         <div className="public-hero-actions">
                             <Link className="public-button public-button-primary" to="/features">Explore the features <span aria-hidden="true">→</span></Link>
@@ -126,8 +133,8 @@ export default function HomePage() {
                             <h2>Departmental project administration, brought together.</h2>
                         </div>
                         <p>
-                            The current platform focuses on the administrative work that helps a department
-                            organise its students, lecturers and supervision responsibilities.
+                            ProjFlow supports departmental administration and the first stage of academic supervision,
+                            from student onboarding and supervisor allocation to project-topic submission and review.
                         </p>
                     </div>
                     <div className="public-capability-grid">
@@ -149,9 +156,9 @@ export default function HomePage() {
                     <div className="public-section-heading public-section-heading-centered">
                         <div>
                             <div className="public-eyebrow">HOW THE PROCESS WORKS</div>
-                            <h2>From departmental setup to supervisor allocation.</h2>
+                            <h2>From departmental setup to project-topic review.</h2>
                         </div>
-                        <p>ProjFlow brings the main onboarding and coordination steps into a consistent departmental workflow.</p>
+                        <p>ProjFlow brings onboarding, supervisor allocation and project-topic review into a consistent departmental workflow.</p>
                     </div>
                     <div className="public-workflow-grid">
                         {workflow.map(([number, title, description], index) => (

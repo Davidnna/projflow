@@ -33,8 +33,20 @@ const steps = [
     },
     {
         number: "06",
+        title: "Students submit their project proposals",
+        description: "After a supervisor has been assigned, each student submits a proposal containing the title, abstract, problem statement, research objectives and keywords.",
+        owner: "Student",
+    },
+    {
+        number: "07",
+        title: "The assigned supervisor reviews the proposal",
+        description: "The supervisor approves the topic, requests revision with feedback or rejects it. Students can revise and resubmit when changes are requested.",
+        owner: "Assigned supervisor and student",
+    },
+    {
+        number: "08",
         title: "Users access their role-based workspace",
-        description: "Students can view their registration information, lecturers can view assigned students, and departmental administrators manage the records and assignments under their responsibility.",
+        description: "Students follow their proposal status and feedback, lecturers review assigned proposals, and departmental administrators manage records and assignments.",
         owner: "Students, lecturers and administrators",
     },
 ];
@@ -51,6 +63,14 @@ const questions = [
     {
         question: "Does registration automatically assign a supervisor?",
         answer: "No. The student must first be verified. The Project Coordinator then assigns a supervisor.",
+    },
+    {
+        question: "Who decides whether a project topic is approved?",
+        answer: "The student's assigned supervisor reviews the proposal and decides whether to approve it, request a revision or reject it.",
+    },
+    {
+        question: "Can a student revise a submitted topic?",
+        answer: "Yes. When the supervisor requests a revision, the student can update the proposal and submit it again. The submission and review history is retained.",
     },
     {
         question: "Can academic sessions be managed without fixed dates?",
@@ -74,8 +94,8 @@ export default function HowItWorksPage() {
                     <div className="public-eyebrow">HOW PROJFLOW WORKS</div>
                     <h1>A clear process for students and the department.</h1>
                     <p>
-                        ProjFlow starts with departmental setup and student onboarding, then brings lecturer
-                        records and supervisor assignments into the same organised workspace.
+                        ProjFlow supports the process from departmental setup and student onboarding through
+                        supervisor allocation and project-topic proposal review.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/register">Student registration <span aria-hidden="true">→</span></Link>
@@ -88,7 +108,7 @@ export default function HowItWorksPage() {
                 <div className="public-container public-how-layout">
                     <div className="public-how-intro">
                         <div className="public-eyebrow">THE DEPARTMENTAL WORKFLOW</div>
-                        <h2>Six steps to organise student onboarding and supervision.</h2>
+                        <h2>From student onboarding to project-topic review.</h2>
                         <p>Each step has a clear owner, so students and staff know what happens next.</p>
                     </div>
                     <div className="public-how-steps">

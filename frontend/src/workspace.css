@@ -1998,3 +1998,267 @@
         transition: none;
     }
 }
+
+
+/* Project topic workflow */
+.topic-start-card {
+    display: grid;
+    justify-items: start;
+    gap: 13px;
+    padding: 30px;
+}
+
+.topic-start-icon {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    color: #1d4ed8;
+    background: #eff6ff;
+    font-size: 22px;
+}
+
+.topic-start-card h2,
+.topic-summary-card h2 {
+    margin: 0;
+    color: var(--workspace-ink);
+    font-size: 19px;
+}
+
+.topic-start-card p {
+    max-width: 680px;
+    margin: 0;
+    color: var(--workspace-muted);
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.topic-supervisor-note {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.topic-supervisor-note strong {
+    color: var(--workspace-ink);
+}
+
+.topic-summary-card {
+    display: grid;
+    gap: 20px;
+    padding: 25px;
+}
+
+.topic-summary-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    color: var(--workspace-muted);
+    font-size: 11px;
+}
+
+.topic-summary-meta strong {
+    color: var(--workspace-ink);
+}
+
+.topic-content-block {
+    display: grid;
+    gap: 7px;
+}
+
+.topic-content-block h3,
+.topic-review-history h3,
+.topic-revision-list h3 {
+    margin: 0;
+    color: var(--workspace-ink);
+    font-size: 13px;
+}
+
+.topic-content-block p {
+    margin: 0;
+    color: #526176;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+
+.topic-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.topic-keywords span {
+    padding: 6px 9px;
+    border: 1px solid #dbeafe;
+    border-radius: 999px;
+    color: #1d4ed8;
+    background: #eff6ff;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.topic-revision-action {
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+}
+
+.topic-review-history {
+    display: grid;
+    gap: 12px;
+    padding-top: 17px;
+    border-top: 1px solid var(--workspace-line);
+}
+
+.topic-review-item {
+    display: grid;
+    gap: 7px;
+    padding: 12px 14px;
+    border: 1px solid var(--workspace-line);
+    border-radius: 10px;
+    background: #fbfcfe;
+}
+
+.topic-review-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.topic-review-heading > span:last-child,
+.topic-queue-actions > span {
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+.topic-review-item p {
+    margin: 0;
+    color: #526176;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.topic-queue-list {
+    display: grid;
+}
+
+.topic-queue-item {
+    display: grid;
+    gap: 12px;
+    padding: 21px 0;
+    border-top: 1px solid var(--workspace-line);
+}
+
+.topic-queue-item:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.topic-queue-main {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.topic-queue-student {
+    display: grid;
+    gap: 4px;
+}
+
+.topic-queue-student strong {
+    color: var(--workspace-ink);
+    font-size: 12px;
+}
+
+.topic-queue-student span {
+    color: var(--workspace-muted);
+    font-size: 10px;
+}
+
+.topic-queue-item h3,
+.topic-review-detail h2 {
+    margin: 0;
+    color: var(--workspace-ink);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.topic-queue-item > p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.7;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.topic-queue-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.topic-review-detail {
+    display: grid;
+    gap: 18px;
+    max-height: 48vh;
+    overflow-y: auto;
+    padding: 2px 2px 18px;
+}
+
+.topic-revision-list {
+    display: grid;
+    gap: 9px;
+    padding-top: 14px;
+    border-top: 1px solid var(--workspace-line);
+}
+
+.topic-revision-list > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #64748b;
+    font-size: 11px;
+}
+
+.topic-revision-list strong {
+    color: var(--workspace-ink);
+}
+
+.topic-form textarea,
+.topic-review-form textarea {
+    min-height: 110px;
+    padding: 12px 14px;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.topic-history-card {
+    margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+    .topic-summary-card,
+    .topic-start-card {
+        padding: 17px;
+    }
+    .topic-summary-meta {
+        display: grid;
+        gap: 8px;
+    }
+    .topic-queue-main,
+    .topic-queue-actions {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .topic-review-detail {
+        max-height: 42vh;
+    }
+}

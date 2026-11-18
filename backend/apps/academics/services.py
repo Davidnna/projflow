@@ -294,12 +294,19 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
     current_assignment.save(update_fields=["is_current", "ended_at", "ended_by"])
 
     try:
-        return SupervisorAssignment.objects.create(
+        new_assignment = SupervisorAssignment.objects.create(
             student_enrollment=current_assignment.student_enrollment,
             lecturer=new_lecturer,
             assigned_by=actor,
             assigned_at=now,
             reassignment_reason=reason,
         )
+        from apps.projects.models import ProjectTopic
+
+        ProjectTopic.objects.filter(
+            student_enrollment=current_assignment.student_enrollment,
+            is_current=True,
+        ).update(supervisor_assignment=new_assignment, updated_at=now)
+        return new_assignment
     except IntegrityError as exc:
         raise ValidationError("The supervisor assignment changed concurrently. Refresh and try again.") from exc

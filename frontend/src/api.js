@@ -243,4 +243,5 @@ export const endpoints = {
     lecturers: "/api/academics/lecturers/",
     lecturerWorkloads: "/api/academics/lecturer-workloads/",
     assignments: "/api/academics/supervisor-assignments/",
+    topics: "/api/projects/topics/",
 };

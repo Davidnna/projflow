@@ -53,11 +53,21 @@ const featureGroups = [
     },
     {
         number: "06",
+        title: "Project topic submission and review",
+        intro: "Move the first academic approval stage into a clear student-supervisor workflow.",
+        points: [
+            "Students submit a title, abstract, problem statement, research objectives and keywords.",
+            "The assigned supervisor approves the proposal, requests revision or rejects it.",
+            "Students can revise and resubmit when changes are requested, with submission history retained.",
+        ],
+    },
+    {
+        number: "07",
         title: "Role-based workspaces",
         intro: "Present relevant information and actions according to each person's role.",
         points: [
-            "Students access their registration and student workspace.",
-            "Lecturers view their assigned students.",
+            "Students submit proposals and follow supervisor feedback.",
+            "Lecturers review proposals from their assigned students.",
             "Project Coordinators and Administrators manage departmental records and assignments.",
         ],
     },
@@ -71,8 +81,8 @@ export default function FeaturesPage() {
                     <div className="public-eyebrow">PROJFLOW FEATURES</div>
                     <h1>The essential tools for organised project administration.</h1>
                     <p>
-                        ProjFlow brings together the academic session, student onboarding and supervision
-                        coordination tasks that departments manage at the start of the final-year project process.
+                        ProjFlow brings together academic sessions, student onboarding, supervisor allocation
+                        and the project-topic proposal and review process.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
@@ -98,8 +108,8 @@ export default function FeaturesPage() {
                         ))}
                     </div>
                     <p className="public-feature-note">
-                        ProjFlow's available features are focused on academic administration, student onboarding
-                        and supervisor coordination. Access to each workspace depends on the user's role.
+                        ProjFlow's available features cover academic administration, student onboarding, supervisor
+                        coordination and project-topic review. Access to each workspace depends on the user's role.
                     </p>
                 </div>
             </section>

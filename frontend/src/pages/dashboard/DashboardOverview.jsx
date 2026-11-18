@@ -139,7 +139,7 @@ function LecturerOverview() {
                 <StatCard label="Account status" value={profile?.is_active ? "Active" : profile ? "Inactive" : "—"} detail="Lecturer account" icon="♧" tone="teal" />
             </div>
             <section className="surface-card dashboard-table-card">
-                <div className="surface-card-heading"><div><span className="panel-eyebrow">MY STUDENTS</span><h2>Current supervisees</h2></div></div>
+                <div className="surface-card-heading"><div><span className="panel-eyebrow">MY STUDENTS</span><h2>Current supervisees</h2></div><Link className="text-link" to="/app/topics/review">Review project topics →</Link></div>
                 {assignments.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th>Student</th><th>Matriculation no.</th><th>Academic session</th><th>Assigned</th></tr></thead><tbody>{assignments.map((item) => <tr key={item.id}><td><strong>{item.student_name}</strong></td><td>{item.matric_number}</td><td>{item.session_name}</td><td>{new Date(item.assigned_at).toLocaleDateString()}</td></tr>)}</tbody></table></div> : <EmptyState title="No students assigned yet" description="Your assigned students will appear here." />}
             </section>
         </>
@@ -179,7 +179,7 @@ function StudentOverview() {
                     {assignment && <Alert type="success">Your supervisor is {assignment.lecturer_name}.</Alert>}
                 </div>
             ) : <EmptyState title="Registration details unavailable" description="We couldn't retrieve your registration details. Please contact your department for assistance." />}
-            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Project information and activities will appear here as they become available to you.</p></div>
+            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Submit your proposed topic and follow your supervisor’s feedback.</p><Link className="button button-primary" to="/app/topics">Open my project topic</Link></div>
         </>
     );
 }

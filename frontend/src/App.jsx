@@ -14,6 +14,8 @@ import StudentsPage from "./pages/coordinator/StudentsPage.jsx";
 import RegistrationsPage from "./pages/coordinator/RegistrationsPage.jsx";
 import LecturersPage from "./pages/coordinator/LecturersPage.jsx";
 import SupervisorsPage from "./pages/coordinator/SupervisorsPage.jsx";
+import ProjectTopicPage from "./pages/student/ProjectTopicPage.jsx";
+import TopicReviewPage from "./pages/lecturer/TopicReviewPage.jsx";
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
 
@@ -35,6 +37,12 @@ export default function App() {
                 <Route path="/app" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/app/overview" replace />} />
                     <Route path="overview" element={<DashboardOverview />} />
+                    <Route element={<ProtectedRoute roles={["student"]} />}>
+                        <Route path="topics" element={<ProjectTopicPage />} />
+                    </Route>
+                    <Route element={<ProtectedRoute roles={["lecturer"]} />}>
+                        <Route path="topics/review" element={<TopicReviewPage />} />
+                    </Route>
                     <Route element={<ProtectedRoute roles={coordinatorRoles} />}>
                         <Route path="sessions" element={<SessionsPage />} />
                         <Route path="students" element={<StudentsPage />} />

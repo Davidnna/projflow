@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.5`
+- **Current release:** `0.3.6`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -92,11 +92,24 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Described only capabilities available in the current release; project-topic proposals, submissions, progress monitoring, defence and assessment are not represented as live features.
 - Updated page metadata and the frontend package version.
 
+
+### Implemented in 0.3.6 (project topic submission and supervisor review)
+
+- Verified students can submit an individual project proposal only after a supervisor has been assigned in the active academic session.
+- Each proposal captures the project title, abstract, problem statement, research objectives and keywords.
+- A student may have one current proposal at a time. A rejected proposal is retained in the history and a new proposal may then be submitted.
+- The currently assigned supervisor alone can approve a submitted topic, request revision or reject it. The Project Coordinator and Administrator cannot make the supervisor's topic decision.
+- Revision requests require written feedback. Students can revise and resubmit a proposal when changes are requested.
+- Each submission is retained as a numbered revision, and each supervisor decision is retained with the revision reviewed, reviewer, decision and feedback.
+- Supervisor reassignment transfers responsibility for the student's current proposal to the new supervisor while preserving earlier review records.
+- Student and lecturer workspaces include project-topic submission and topic-review pages.
+- Topic records retain all submitted proposals and statuses for the historical comparison feature planned in the next increment. Automated topic similarity detection is not included in this release.
+
 ### Not implemented yet
 
 The following modules are planned for later development and must not be treated as operational features in this release:
 
-- Project-topic proposals, supervisor topic decisions and local topic-similarity analysis.
+- Historical topic similarity comparison using the approved local hybrid keyword and semantic analysis approach.
 - Chapter and final-project submissions, private Supabase Storage integration and annotated feedback.
 - Coordinator-defined project milestones, progress reports, deadlines and extension requests.
 - Final-project recommendation and departmental defence clearance.
@@ -129,6 +142,7 @@ projflow/
 │   ├── apps/
 │   │   ├── accounts/
 │   │   ├── academics/
+│   │   ├── projects/
 │   │   └── core/
 │   ├── config/
 │   ├── .env.example
@@ -185,11 +199,12 @@ The Coordinator can approve or reject a registration requiring manual review. Re
 - The Coordinator can reassign a student at any time during the active session.
 - A reassignment reason is mandatory. The previous assignment, new assignment, date, Coordinator and reason remain in the history.
 
-### 5.3 Project topics and supervision (planned)
+### 5.3 Project topics and supervision
 
-- Students independently propose project topics after a supervisor has been assigned.
-- Only the assigned supervisor approves, requests revision or rejects a topic.
-- Potentially similar topics are compared against all submitted proposals from current and previous academic sessions, regardless of their approval status. The comparison covers title, abstract, problem statement, research objectives and keywords. A local hybrid keyword/semantic engine (no external AI API) uses fixed system thresholds. The assigned supervisor alone sees potential matches, similarity percentages, previous project title/session/status and matched sections; complete historical project documents are not exposed. Similarity findings are advisory and do not automatically reject a proposal.
+- Students independently submit project topics after a supervisor has been assigned. The proposal includes a title, abstract, problem statement, research objectives and keywords.
+- Only the currently assigned supervisor approves, requests revision or rejects a topic. The Project Coordinator does not make topic decisions.
+- A revision request must include written feedback. The student can revise and resubmit, with each submitted version and supervisor decision retained in the history. A rejected proposal remains in the historical record, and the student may submit a new proposal.
+- Potentially similar topics will be compared against all submitted proposals from current and previous academic sessions, regardless of approval status. The comparison covers title, abstract, problem statement, research objectives and keywords. A local hybrid keyword/semantic engine (no external AI API) will use fixed system thresholds. The assigned supervisor alone will see potential matches, similarity percentages, previous project title/session/status and matched sections; complete historical project documents will not be exposed. Similarity findings will be advisory and will not automatically reject a proposal.
 - Students can submit chapters in any order; chapter approval is not a prerequisite for submitting another chapter.
 - Supervisors provide both written feedback and annotated document uploads.
 
@@ -307,7 +322,21 @@ Student registration requires an active academic session. Passwords must be at l
 | `POST` | `/api/academics/supervisor-assignments/assign/` | Assign a supervisor (Coordinator/Administrator) |
 | `POST` | `/api/academics/supervisor-assignments/{id}/reassign/` | Reassign with a mandatory reason (Coordinator/Administrator) |
 
-## 7. Data model introduced in Phase 1
+### Project-topic proposals and supervisor review
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/projects/topics/` | List project topics available to the authenticated role |
+| `POST` | `/api/projects/topics/` | Submit a new proposal (verified student with a current supervisor) |
+| `GET` | `/api/projects/topics/mine/` | List the authenticated student's proposals and history |
+| `GET` | `/api/projects/topics/review-queue/` | List submitted proposals assigned to the authenticated lecturer |
+| `GET` | `/api/projects/topics/{id}/` | Retrieve an accessible proposal and its revision/review history |
+| `POST` | `/api/projects/topics/{id}/resubmit/` | Resubmit a proposal after a supervisor requests revision |
+| `POST` | `/api/projects/topics/{id}/review/` | Approve, request revision or reject (currently assigned supervisor only) |
+
+A proposal requires a title, abstract, problem statement, research objectives and at least one keyword. A student must have a verified enrolment in the active session and a current supervisor assignment before submitting. A revision request or rejection must include supervisor feedback. Each submission is saved as a numbered revision. A rejected proposal remains in the historical record and no longer blocks a new proposal. A student may have only one current proposal per enrolment. Reassigning a supervisor transfers the current proposal to the new supervisor; earlier review records remain linked to the supervisor who made each decision.
+
+## 7. Data model introduced across releases
 
 | Entity | Purpose and important integrity rules |
 |---|---|
@@ -318,6 +347,9 @@ Student registration requires an active academic session. Passwords must be at l
 | `StudentEnrollment` | Links a user to a session and records automatic/manual verification; one matriculation number and one user enrolment per session |
 | `LecturerProfile` | Lecturer staff details linked to a user account |
 | `SupervisorAssignment` | Current and historical supervisor assignments; database constraint permits only one current supervisor per student enrolment |
+| `ProjectTopic` | Student proposal, current supervisor responsibility and workflow status; one current proposal per enrolment |
+| `ProjectTopicRevision` | Immutable numbered snapshots of each student submission |
+| `ProjectTopicReview` | Supervisor decision and feedback linked to the exact revision reviewed |
 | `User`, `Role`, `UserRole` | Existing UUID-based account model, global roles and role assignments |
 
 Sensitive changes are performed through transactional service functions. Academic session, roster, enrolment and assignment records are retained rather than silently overwritten.

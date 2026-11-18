@@ -24,8 +24,8 @@ export default function PlatformPage() {
                     <h1>A clearer way to coordinate the departmental project process.</h1>
                     <p>
                         ProjFlow is a web-based final-year project management platform for academic departments.
-                        It brings together the administrative work involved in organising academic sessions,
-                        student onboarding, lecturer records and supervisor allocation.
+                        It brings together academic session management, student onboarding, lecturer records,
+                        supervisor allocation and project-topic proposal review.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/features">Explore platform features <span aria-hidden="true">→</span></Link>
@@ -44,7 +44,7 @@ export default function PlatformPage() {
                         <p>
                             Final-year project administration involves more than the project document itself.
                             Departments also need to maintain student records, organise academic sessions,
-                            onboard students, manage lecturer information and keep supervision assignments clear.
+                            onboard students, manage lecturer information, allocate supervisors and review project topics.
                         </p>
                         <p>
                             ProjFlow provides a shared digital workspace for these responsibilities, helping
@@ -89,6 +89,7 @@ export default function PlatformPage() {
                         <div><span>✓</span><p>Academic sessions are activated and closed by the Project Coordinator.</p></div>
                         <div><span>✓</span><p>Student records can be entered individually or imported in a spreadsheet.</p></div>
                         <div><span>✓</span><p>Verified students can be assigned to a project supervisor.</p></div>
+                        <div><span>✓</span><p>Students submit proposals to their assigned supervisor for review and approval.</p></div>
                     </div>
                 </div>
             </section>
