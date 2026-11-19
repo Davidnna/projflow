@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.11`
+- **Current release:** `0.3.12`
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -13,7 +13,7 @@ This README is the repository's sole Markdown document. It contains the software
 
 ## 1. Current implementation status
 
-Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation. Release `0.3.9` adds Coordinator-defined session milestones, student progress reports, supervisor assessments, revision requests and report history. Release `0.3.10` adds an Administrator-managed Coordinator Access page for granting and revoking the Project Coordinator role while preserving Coordinator-only milestone management. Release `0.3.11` fixes a student progress page rendering error by deriving academic-session availability from the milestone session status and preventing submissions or revisions when the session is not active.
+Release `0.1.0` established the branded React application, Django API, custom user model, global roles, health endpoints and deployment foundation. Release `0.2.0` introduced the academic administration backend modules. Release `0.3.0` added the authenticated React workspace and operational interfaces for the existing APIs. Release `0.3.1` adds secure one-time initial Administrator provisioning through the live application. Release `0.3.2` removes calendar dates from academic session administration and makes session activation/closure fully manual. Release `0.3.3` completes roster-based student verification by comparing every populated departmental identity field. Release `0.3.4` simplifies user-facing messages, removes public technical status and initial-setup pages, and limits student registration responses to information students need. Release `0.3.5` expands the public website with dedicated About, Features and How It Works pages, clear navigation, mobile navigation, role descriptions, workflow guidance and FAQs. Release `0.3.6` introduces student project-topic proposals, supervisor-only decisions, resubmission history and role-specific topic workspaces. Release `0.3.7` adds a supervisor topic register with separate views for awaiting review, approved, revision-requested, rejected and all assigned topic records. Release `0.3.8` adds local hybrid keyword and semantic similarity analysis across historical proposals, supervisor-only similarity reports, cached revision embeddings and deployment-time model preparation. Release `0.3.9` adds Coordinator-defined session milestones, student progress reports, supervisor assessments, revision requests and report history. Release `0.3.10` adds an Administrator-managed Coordinator Access page for granting and revoking the Project Coordinator role while preserving Coordinator-only milestone management. Release `0.3.11` fixes a student progress page rendering error by deriving academic-session availability from the milestone session status and preventing submissions or revisions when the session is not active. Release `0.3.12` replaces the student milestone-report interpretation with a chapter-by-chapter project report workflow: Coordinator-configured report sections, separate PDF/DOCX uploads, private Supabase Storage, optional submission notes, supervisor approval/revision decisions, version history and sequential section unlocking.
 
 ### Implemented in 0.2.0 (backend)
 
@@ -128,9 +128,9 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - The Render build prepares the model cache before deployment; `.model_cache/` is excluded from Git.
 
 
-### Implemented in 0.3.9 (milestones and progress monitoring)
+### Implemented in 0.3.9 (legacy milestone progress monitoring)
 
-- The Project Coordinator defines a common ordered milestone structure for each academic session; supervisors cannot add or modify individual student milestones.
+- This release introduced a common ordered milestone structure for each academic session. In 0.3.12, the live student/supervisor workflow was replaced by chapter-by-chapter report submissions; the original milestone tables and API remain only for historical compatibility.
 - Milestones contain a title, description, expected achievement, sequence number and optional due date. Academic session start/end dates remain unnecessary; milestone due dates are independently optional.
 - Students with verified enrolment and a current supervisor submit one progress report per milestone, describing completed activities, challenges and next steps.
 - The assigned supervisor reviews each report, records an assessment (on track, needs attention, behind schedule or milestone completed), and provides feedback. A supervisor can request a revision; revision requests require feedback.
@@ -145,11 +145,22 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - The page now reads the session status exposed by the milestone API and uses it to determine whether new progress reports or revisions can be submitted.
 - Historical progress reports and supervisor feedback remain visible when a session is not active; submission actions are disabled until the session is active.
 
+### Implemented in 0.3.12 (chapter-by-chapter project report submissions)
+
+- Replaced the milestone interpretation in the student-facing project progress page with a project report workspace organised by report sections.
+- The Project Coordinator configures one shared report structure per academic session. A suggested eight-section template covers Preliminary Pages, Chapters One to Five, References and optional Appendices; the Coordinator can adjust it before students submit.
+- Students submit each report section separately as a PDF or DOCX document, up to 20 MB, with an optional note for the assigned supervisor.
+- The assigned supervisor can download each version, approve a section or request a revision with mandatory feedback. A required next section is unlocked only after the previous required section is approved.
+- Each resubmission creates a new immutable document version. Original file names, file sizes, notes, timestamps and supervisor review history are retained.
+- Report documents are stored in a private Supabase Storage bucket. The Django backend uses a server-side Supabase secret key (with legacy `service_role` key fallback) and returns five-minute signed download URLs only after checking the authenticated student's or supervisor's access.
+- Students can access only their own report sections and submissions. Supervisors can access submissions from currently assigned students and submissions they previously reviewed. Administrators and Project Coordinators cannot access individual report documents through these APIs.
+- Existing milestone and progress-report tables and endpoints are retained as legacy records; the current student and supervisor interfaces use the new report-section workflow.
+
 ### Not implemented yet
 
 The following modules are planned for later development and must not be treated as operational features in this release:
 
-- Chapter and final-project submissions, private Supabase Storage integration, progress-report supporting-file uploads and annotated feedback.
+- Inline document annotations, tracked changes and page-level comments on uploaded report documents.
 - Session-specific project deadlines and extension requests.
 - Final-project recommendation and departmental defence clearance.
 - Examination panels, defence scheduling and supervisor conflict-of-interest checks.
@@ -163,6 +174,7 @@ The following modules are planned for later development and must not be treated 
 |---|---|---|
 | Frontend | React 19, Vite, React Router 7 | Web interface and role-specific workflows |
 | Backend | Django 5.2, Django REST Framework | Business rules, validation, authentication and REST API |
+| Document storage | Private Supabase Storage | Student report documents and time-limited authorised downloads |
 | Authentication | Simple JWT | Short-lived access tokens and rotating refresh tokens |
 | Database | Supabase PostgreSQL | Accounts, academic records, workflow state and audit history |
 | Local database fallback | SQLite | Local development and automated tests when `DATABASE_URL` is absent |
@@ -512,6 +524,9 @@ export DJANGO_DEBUG="True"
 export DJANGO_ALLOWED_HOSTS="localhost,127.0.0.1"
 export CORS_ALLOWED_ORIGINS="http://localhost:5173"
 export DATABASE_URL=""
+export SUPABASE_URL="https://your-project-ref.supabase.co"
+export SUPABASE_SECRET_KEY="sb_secret_your-private-secret-key"
+export PROJFLOW_REPORTS_BUCKET="projflow-project-reports"
 ```
 
 Windows PowerShell:
@@ -522,6 +537,9 @@ $env:DJANGO_DEBUG = "True"
 $env:DJANGO_ALLOWED_HOSTS = "localhost,127.0.0.1"
 $env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
 $env:DATABASE_URL = ""
+$env:SUPABASE_URL = "https://your-project-ref.supabase.co"
+$env:SUPABASE_SECRET_KEY = "sb_secret_your-private-secret-key"
+$env:PROJFLOW_REPORTS_BUCKET = "projflow-project-reports"
 ```
 
 Apply database migrations and create a local-only development Administrator account:
@@ -619,6 +637,9 @@ Configure these environment values in Render:
 | `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` | Temporary random secret for first Administrator setup; remove after setup |
 | `CORS_ALLOWED_ORIGINS` | Exact Cloudflare Pages origin |
 | `CSRF_TRUSTED_ORIGINS` | Exact Cloudflare Pages origin |
+| `SUPABASE_URL` | Supabase project URL from Project Settings / API |
+| `SUPABASE_SECRET_KEY` | Private server-side secret key (starts with `sb_secret_`) from Supabase API Keys; never expose it in frontend settings or source control. The legacy `SUPABASE_SERVICE_ROLE_KEY` variable is accepted as a fallback. |
+| `PROJFLOW_REPORTS_BUCKET` | `projflow-project-reports` |
 
 The Render start command applies committed migrations before starting Gunicorn. This is configured for the current service plan; use a dedicated pre-deploy migration step if the hosting plan supports it.
 
@@ -646,7 +667,19 @@ After Cloudflare creates the Pages URL, set the exact origin (including `https:/
 
 Render's free service may sleep after inactivity. Its local filesystem is ephemeral and must not be used for permanent student documents. Supabase Free has storage/compute limits and may pause projects; production use requires a documented backup and retention arrangement.
 
-### 10.6 Supabase activity keep-alive workflow
+### 10.6 Private Supabase Storage for project reports
+
+The report-submission module stores student documents in a private Supabase Storage bucket. Before students upload report sections:
+
+1. In Supabase, open Storage and create a bucket named `projflow-project-reports`.
+2. Keep the bucket private; do not enable public access. Set the bucket's maximum file size to 20 MB. If the dashboard offers allowed MIME types, permit `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+3. In Supabase Project Settings / API Keys, copy the project URL and the server-side `service_role` secret key. Do not use the publishable/anon key for this backend integration.
+4. In Render, set `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `PROJFLOW_REPORTS_BUCKET` in the backend service Environment settings. The bucket variable must be `projflow-project-reports` unless the bucket name is deliberately changed in both places.
+5. Save the Render environment changes and wait for the service to restart. The secret key must remain on Render only; never place it in Cloudflare Pages, a `VITE_` variable, GitHub or a message. New Supabase secret keys are sent through the `apikey` header; legacy `service_role` JWT keys remain supported for older projects.
+
+The Django API validates PDF/DOCX file signatures and size before upload. It stores opaque object paths in PostgreSQL, not public URLs. Downloads are issued through authenticated API checks and five-minute signed URLs. The backend checks that the bucket is private before upload and download. If the bucket is public, or the storage variables or bucket are not configured, document access is refused and the application displays a user-friendly message.
+
+### 10.7 Supabase activity keep-alive workflow
 
 The repository includes `.github/workflows/supabase-keepalive.yml`. It calls the deployed `/api/ready/` endpoint twice daily and can also be run manually. Configure the GitHub Actions repository variable `PROJFLOW_READINESS_URL` with the exact Render readiness URL after deployment. The workflow does not contain database credentials and is best-effort, not a guarantee against Supabase pausing.
 

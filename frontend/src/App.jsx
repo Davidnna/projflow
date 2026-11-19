@@ -17,7 +17,7 @@ import SupervisorsPage from "./pages/coordinator/SupervisorsPage.jsx";
 import ProjectTopicPage from "./pages/student/ProjectTopicPage.jsx";
 import TopicReviewPage from "./pages/lecturer/TopicReviewPage.jsx";
 import ProgressReviewPage from "./pages/lecturer/ProgressReviewPage.jsx";
-import MilestonesPage from "./pages/coordinator/MilestonesPage.jsx";
+import ReportStructurePage from "./pages/coordinator/ReportStructurePage.jsx";
 import CoordinatorAccessPage from "./pages/coordinator/CoordinatorAccessPage.jsx";
 import ProgressPage from "./pages/student/ProgressPage.jsx";
 
@@ -55,7 +55,7 @@ export default function App() {
                         <Route path="coordinator-access" element={<CoordinatorAccessPage />} />
                     </Route>
                     <Route element={<ProtectedRoute roles={["project_coordinator"]} />}>
-                        <Route path="milestones" element={<MilestonesPage />} />
+                        <Route path="report-structure" element={<ReportStructurePage />} />
                     </Route>
                     <Route element={<ProtectedRoute roles={coordinatorRoles} />}>
                         <Route path="sessions" element={<SessionsPage />} />

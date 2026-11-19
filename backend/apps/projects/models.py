@@ -376,3 +376,185 @@ class ProjectProgressReview(models.Model):
 
     def __str__(self):
         return f"{self.report_id}: {self.get_assessment_display()}"
+
+
+class ReportSubmissionStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    REVISION_REQUESTED = "revision_requested", "Revision requested"
+    APPROVED = "approved", "Approved"
+
+
+class ReportReviewDecision(models.TextChoices):
+    APPROVE = "approve", "Approve"
+    REQUEST_REVISION = "request_revision", "Request revision"
+
+
+class ProjectReportSection(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        "academics.AcademicSession",
+        on_delete=models.PROTECT,
+        related_name="project_report_sections",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    sequence = models.PositiveIntegerField()
+    due_date = models.DateField(null=True, blank=True)
+    is_required = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_report_sections_created",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_report_sections_updated",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "projects_report_section"
+        ordering = ["session__created_at", "sequence", "title"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "sequence"],
+                name="projects_unique_report_section_order",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["session", "is_active", "sequence"],
+                name="projects_report_section_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.session.name}: {self.sequence}. {self.title}"
+
+
+class ProjectReportSubmission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    section = models.ForeignKey(
+        ProjectReportSection,
+        on_delete=models.PROTECT,
+        related_name="submissions",
+    )
+    student_enrollment = models.ForeignKey(
+        "academics.StudentEnrollment",
+        on_delete=models.PROTECT,
+        related_name="project_report_submissions",
+    )
+    supervisor_assignment = models.ForeignKey(
+        "academics.SupervisorAssignment",
+        on_delete=models.PROTECT,
+        related_name="project_report_submissions",
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=ReportSubmissionStatus.choices,
+        default=ReportSubmissionStatus.SUBMITTED,
+    )
+    submitted_at = models.DateTimeField(default=timezone.now)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "projects_report_submission"
+        ordering = ["-submitted_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["section", "student_enrollment"],
+                name="projects_unique_student_report_section",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["student_enrollment", "status"],
+                name="projects_report_student_idx",
+            ),
+            models.Index(
+                fields=["supervisor_assignment", "status"],
+                name="projects_report_supervisor_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student_enrollment.matric_number}: {self.section.title}"
+
+
+class ProjectReportRevision(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        ProjectReportSubmission,
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    revision_number = models.PositiveIntegerField()
+    storage_path = models.CharField(max_length=512, editable=False)
+    original_filename = models.CharField(max_length=255)
+    file_size = models.PositiveBigIntegerField()
+    content_type = models.CharField(max_length=120)
+    submission_note = models.TextField(blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_report_revisions_uploaded",
+    )
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "projects_report_revision"
+        ordering = ["revision_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission", "revision_number"],
+                name="projects_unique_report_revision",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.submission_id} revision {self.revision_number}"
+
+
+class ProjectReportReview(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(
+        ProjectReportSubmission,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    revision = models.ForeignKey(
+        ProjectReportRevision,
+        on_delete=models.PROTECT,
+        related_name="reviews",
+    )
+    supervisor_assignment = models.ForeignKey(
+        "academics.SupervisorAssignment",
+        on_delete=models.PROTECT,
+        related_name="project_report_reviews",
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="project_report_reviews",
+    )
+    decision = models.CharField(max_length=24, choices=ReportReviewDecision.choices)
+    feedback = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = "projects_report_review"
+        ordering = ["-reviewed_at"]
+        indexes = [
+            models.Index(
+                fields=["submission", "reviewed_at"],
+                name="projects_report_review_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.submission_id}: {self.get_decision_display()}"

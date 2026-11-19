@@ -73,13 +73,13 @@ const featureGroups = [
     },
     {
         number: "08",
-        title: "Project milestones and progress monitoring",
-        intro: "Keep project work moving through common departmental milestones and supervisor feedback.",
+        title: "Project report submissions and review",
+        intro: "Manage the final-year report section by section, from preliminary pages through references and appendices.",
         points: [
-            "The Project Coordinator defines the milestone structure for each academic session.",
-            "Students submit progress reports describing completed activities, challenges and next steps.",
-            "Supervisors review reports, provide feedback and record progress assessments.",
-            "Submission and assessment history remains available to the student and assigned supervisor.",
+            "The Project Coordinator defines the common report structure for each academic session.",
+            "Students upload each section separately as a PDF or DOCX document and may include a submission note.",
+            "The assigned supervisor reviews each document, approves it or requests revisions before the next required section is unlocked.",
+            "Every submission version and supervisor review remains available to the student and authorised supervisor.",
         ],
     },
     {
@@ -103,7 +103,7 @@ export default function FeaturesPage() {
                     <h1>The essential tools for organised project administration.</h1>
                     <p>
                         ProjFlow brings together academic sessions, student onboarding, supervisor allocation,
-                        project-topic review, historical topic similarity checks and milestone-based progress monitoring.
+                        project-topic review, historical topic similarity checks and chapter-by-chapter project report submissions.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
@@ -130,7 +130,7 @@ export default function FeaturesPage() {
                     </div>
                     <p className="public-feature-note">
                         ProjFlow's available features cover academic administration, student onboarding, supervisor
-                        coordination, project-topic review, supervisor-only similarity findings and milestone-based progress monitoring. Access to each workspace depends on the user's role.
+                        coordination, project-topic review, supervisor-only similarity findings and project report submission and review. Access to each workspace depends on the user's role.
                     </p>
                 </div>
             </section>

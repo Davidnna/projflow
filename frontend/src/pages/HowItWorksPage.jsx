@@ -57,8 +57,8 @@ const steps = [
     },
     {
         number: "10",
-        title: "Students report progress at project milestones",
-        description: "The Coordinator defines a common milestone structure for the academic session. Students submit reports against those milestones, and their assigned supervisors review progress and provide feedback.",
+        title: "Students submit project report sections",
+        description: "The Coordinator defines the report structure for the academic session. Students upload each section separately, and the assigned supervisor approves it or requests revisions before the next required section is unlocked.",
         owner: "Project Coordinator, student and assigned supervisor",
     },
 ];
@@ -89,8 +89,8 @@ const questions = [
         answer: "Yes. When the supervisor requests a revision, the student can update the proposal and submit it again. The submission and review history is retained.",
     },
     {
-        question: "How is project progress monitored?",
-        answer: "The Project Coordinator defines common milestones for each academic session. Students submit progress reports at those milestones, and their assigned supervisors review the reports, assess progress and provide feedback.",
+        question: "How do students submit their final-year project report?",
+        answer: "The Project Coordinator defines the report sections for the academic session. Students upload each section as a separate PDF or DOCX document. Their assigned supervisor reviews each section, approves it or requests revisions, and approval unlocks the next required section.",
     },
     {
         question: "Can academic sessions be managed without fixed dates?",
@@ -115,7 +115,7 @@ export default function HowItWorksPage() {
                     <h1>A clear process for students and the department.</h1>
                     <p>
                         ProjFlow supports the process from departmental setup and student onboarding through
-                        supervisor allocation, project-topic proposal review, topic similarity assessment and milestone-based progress monitoring.
+                        supervisor allocation, project-topic proposal review, topic similarity assessment and chapter-by-chapter project report submission.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/register">Student registration <span aria-hidden="true">→</span></Link>
@@ -128,7 +128,7 @@ export default function HowItWorksPage() {
                 <div className="public-container public-how-layout">
                     <div className="public-how-intro">
                         <div className="public-eyebrow">THE DEPARTMENTAL WORKFLOW</div>
-                        <h2>From student onboarding to project progress monitoring.</h2>
+                        <h2>From student onboarding to final project report review.</h2>
                         <p>Each step has a clear owner, so students and staff know what happens next.</p>
                     </div>
                     <div className="public-how-steps">

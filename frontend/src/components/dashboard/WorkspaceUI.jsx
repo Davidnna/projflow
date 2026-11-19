@@ -37,7 +37,8 @@ export function StatusBadge({ value, children }) {
         inactive: "Inactive",
         approved: "Approved",
         reviewed: "Reviewed",
-        not_submitted: "Awaiting report",
+        not_submitted: "Not submitted",
+        locked: "Locked",
         submitted: "Awaiting review",
         revision_requested: "Revision requested",
         pending: "Pending",
@@ -48,7 +49,7 @@ export function StatusBadge({ value, children }) {
         ? "success"
         : ["pending_review", "planned", "previewed", "pending", "invalid", "duplicate", "submitted", "revision_requested", "not_submitted"].includes(value)
             ? "warning"
-            : ["closed", "rejected", "inactive"].includes(value) ? "muted" : "info";
+            : ["closed", "rejected", "inactive", "locked"].includes(value) ? "muted" : "info";
     return <span className={`state-badge state-badge--${tone}`}>{label}</span>;
 }
 

@@ -246,6 +246,6 @@ export const endpoints = {
     lecturerWorkloads: "/api/academics/lecturer-workloads/",
     assignments: "/api/academics/supervisor-assignments/",
     topics: "/api/projects/topics/",
-    milestones: "/api/projects/milestones/",
-    progressReports: "/api/projects/progress-reports/",
+    reportSections: "/api/projects/report-sections/",
+    reportSubmissions: "/api/projects/report-submissions/",
 };

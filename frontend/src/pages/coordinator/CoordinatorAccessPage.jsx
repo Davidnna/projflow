@@ -60,7 +60,7 @@ export default function CoordinatorAccessPage() {
             <PageHeader
                 eyebrow="ACCOUNT ADMINISTRATION"
                 title="Coordinator access"
-                description="Manage which staff accounts can configure project milestones for academic sessions."
+                description="Manage which staff accounts can configure the project report structure for academic sessions."
             />
             {error && <Alert type="error" onClose={() => setError("")}>{error}</Alert>}
             {success && <Alert type="success" onClose={() => setSuccess("")}>{success}</Alert>}

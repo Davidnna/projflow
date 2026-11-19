@@ -1,6 +1,9 @@
-from unittest.mock import patch
+import os
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -26,8 +29,12 @@ from .models import (
     ProjectTopicSimilarity,
     ProjectTopicStatus,
     SimilarityAnalysisStatus,
+    ProjectReportSection,
+    ProjectReportSubmission,
+    ReportSubmissionStatus,
 )
 from .similarity import analyse_topic_similarity, lexical_similarity
+from .report_files import _storage_request
 
 User = get_user_model()
 
@@ -898,3 +905,357 @@ class ProjectMilestoneAndProgressAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ProjectReportSubmissionAPITests(APITestCase):
+    def setUp(self):
+        self.student = self.create_user("report.student@example.com", RoleCode.STUDENT)
+        self.lecturer = self.create_user("report.supervisor@example.com", RoleCode.LECTURER)
+        self.other_lecturer = self.create_user("report.other@example.com", RoleCode.LECTURER)
+        self.coordinator = self.create_user("report.coordinator@example.com", RoleCode.PROJECT_COORDINATOR)
+        self.administrator = self.create_user("report.admin@example.com", RoleCode.ADMINISTRATOR)
+        self.session = AcademicSession.objects.create(
+            name="2028/2029",
+            status=AcademicSessionStatus.ACTIVE,
+        )
+        self.enrollment = StudentEnrollment.objects.create(
+            user=self.student,
+            session=self.session,
+            matric_number="CS/2028/REPORT001",
+            verification_status=StudentVerificationStatus.AUTO_VERIFIED,
+            verification_method=VerificationMethod.AUTOMATIC,
+        )
+        self.lecturer_profile = LecturerProfile.objects.create(user=self.lecturer)
+        self.other_lecturer_profile = LecturerProfile.objects.create(user=self.other_lecturer)
+        self.assignment = SupervisorAssignment.objects.create(
+            student_enrollment=self.enrollment,
+            lecturer=self.lecturer_profile,
+            assigned_by=self.coordinator,
+        )
+        self.section_one = ProjectReportSection.objects.create(
+            session=self.session,
+            title="Preliminary Pages",
+            description="Title page, declaration, certification, abstract and contents.",
+            sequence=1,
+            created_by=self.coordinator,
+            updated_by=self.coordinator,
+        )
+        self.section_two = ProjectReportSection.objects.create(
+            session=self.session,
+            title="Chapter One — Introduction",
+            description="Introduction and background to the study.",
+            sequence=2,
+            created_by=self.coordinator,
+            updated_by=self.coordinator,
+        )
+
+    def create_user(self, email, role_code):
+        user = User.objects.create_user(
+            email=email,
+            password="Strong-test-password-123",
+            first_name="Report",
+            last_name="Tester",
+        )
+        role = Role.objects.get(code=role_code)
+        UserRole.objects.create(user=user, role=role)
+        return user
+
+    def make_pdf(self, filename="section.pdf"):
+        return SimpleUploadedFile(
+            filename,
+            b"%PDF-1.7\n% ProjFlow test document\n%%EOF",
+            content_type="application/pdf",
+        )
+
+    def submit_section(self, section=None):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str((section or self.section_one).pk),
+                "file": self.make_pdf(),
+                "submission_note": "Please review this section.",
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        return ProjectReportSubmission.objects.get(pk=response.data["id"])
+
+    def test_coordinator_can_create_standard_report_structure(self):
+        empty_session = AcademicSession.objects.create(
+            name="2029/2030",
+            status=AcademicSessionStatus.PLANNED,
+        )
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.post(
+            "/api/projects/report-sections/create-standard-structure/",
+            {"session": str(empty_session.pk)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(len(response.data), 8)
+        self.assertEqual(response.data[0]["title"], "Preliminary Pages")
+        self.assertEqual(response.data[-1]["title"], "Appendices")
+        self.assertFalse(response.data[-1]["is_required"])
+
+    def test_only_project_coordinator_can_create_report_sections(self):
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.post(
+            "/api/projects/report-sections/",
+            {
+                "session": str(self.session.pk),
+                "title": "Chapter Six",
+                "sequence": 3,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_administrator_without_coordinator_role_cannot_manage_report_structure(self):
+        self.client.force_authenticate(self.administrator)
+        response = self.client.post(
+            "/api/projects/report-sections/",
+            {
+                "session": str(self.session.pk),
+                "title": "Additional Section",
+                "sequence": 3,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_student_can_view_their_session_report_sections(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.get("/api/projects/report-sections/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["title"], "Preliminary Pages")
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_student_can_submit_first_section_as_pdf(self, upload_mock):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": self.make_pdf("preliminary-pages.pdf"),
+                "submission_note": "The preliminary pages are attached.",
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        upload_mock.assert_called_once()
+        submission = ProjectReportSubmission.objects.get(pk=response.data["id"])
+        self.assertEqual(submission.status, ReportSubmissionStatus.SUBMITTED)
+        revision = submission.revisions.get()
+        self.assertEqual(revision.original_filename, "preliminary-pages.pdf")
+        self.assertEqual(revision.submission_note, "The preliminary pages are attached.")
+        self.assertEqual(revision.content_type, "application/pdf")
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_student_cannot_submit_report_section_for_closed_session(self, upload_mock):
+        self.session.status = AcademicSessionStatus.CLOSED
+        self.session.save(update_fields=["status"])
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": self.make_pdf(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        upload_mock.assert_not_called()
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_student_cannot_submit_without_a_current_supervisor(self, upload_mock):
+        self.assignment.is_current = False
+        self.assignment.save(update_fields=["is_current"])
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": self.make_pdf(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        upload_mock.assert_not_called()
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_student_cannot_access_another_students_report_submission(self, upload_mock):
+        submission = self.submit_section(section=self.section_one)
+        another_student = self.create_user("report.other.student@example.com", RoleCode.STUDENT)
+        self.client.force_authenticate(another_student)
+        response = self.client.get(f"/api/projects/report-submissions/{submission.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_student_cannot_submit_next_section_before_previous_section_is_approved(self, upload_mock):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_two.pk),
+                "file": self.make_pdf(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        upload_mock.assert_not_called()
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_supervisor_approval_unlocks_next_required_section(self, upload_mock):
+        self.client.force_authenticate(self.student)
+        first_response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": self.make_pdf("preliminary.pdf"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED, first_response.data)
+        submission = ProjectReportSubmission.objects.get(pk=first_response.data["id"])
+
+        self.client.force_authenticate(self.lecturer)
+        review_response = self.client.post(
+            f"/api/projects/report-submissions/{submission.pk}/review/",
+            {"decision": "approve", "feedback": "Preliminary pages approved."},
+            format="json",
+        )
+        self.assertEqual(review_response.status_code, status.HTTP_200_OK, review_response.data)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, ReportSubmissionStatus.APPROVED)
+
+        self.client.force_authenticate(self.student)
+        next_response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_two.pk),
+                "file": self.make_pdf("chapter-one.pdf"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(next_response.status_code, status.HTTP_201_CREATED, next_response.data)
+        self.assertEqual(upload_mock.call_count, 2)
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_supervisor_can_request_revision_and_student_can_resubmit_new_document_version(self, upload_mock):
+        submission = self.submit_section(section=self.section_one)
+        self.client.force_authenticate(self.lecturer)
+        review_response = self.client.post(
+            f"/api/projects/report-submissions/{submission.pk}/review/",
+            {"decision": "request_revision", "feedback": "Please correct the formatting and update the abstract."},
+            format="json",
+        )
+        self.assertEqual(review_response.status_code, status.HTTP_200_OK, review_response.data)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, ReportSubmissionStatus.REVISION_REQUESTED)
+
+        self.client.force_authenticate(self.student)
+        revision_response = self.client.post(
+            f"/api/projects/report-submissions/{submission.pk}/resubmit/",
+            {
+                "file": self.make_pdf("preliminary-pages-revised.pdf"),
+                "submission_note": "The requested corrections have been made.",
+            },
+            format="multipart",
+        )
+        self.assertEqual(revision_response.status_code, status.HTTP_200_OK, revision_response.data)
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, ReportSubmissionStatus.SUBMITTED)
+        self.assertEqual(submission.revisions.count(), 2)
+        self.assertEqual(upload_mock.call_count, 2)
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_non_pdf_or_docx_upload_is_rejected(self, upload_mock):
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": SimpleUploadedFile("notes.txt", b"not a report document"),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        upload_mock.assert_not_called()
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_other_supervisor_cannot_access_submission(self, upload_mock):
+        submission = self.submit_section(section=self.section_one)
+        self.client.force_authenticate(self.other_lecturer)
+        response = self.client.get(f"/api/projects/report-submissions/{submission.pk}/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_coordinator_cannot_access_student_report_documents(self, upload_mock):
+        self.submit_section(section=self.section_one)
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.get("/api/projects/report-submissions/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    @patch("apps.projects.report_views.create_report_download_url", return_value="https://storage.example/signed-document")
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_assigned_supervisor_can_request_short_lived_document_download(self, upload_mock, download_mock):
+        submission = self.submit_section(section=self.section_one)
+        revision = submission.revisions.get()
+        self.client.force_authenticate(self.lecturer)
+        response = self.client.get(
+            f"/api/projects/report-submissions/{submission.pk}/revisions/{revision.pk}/download/"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["url"], "https://storage.example/signed-document")
+        self.assertEqual(response.data["expires_in"], 300)
+        download_mock.assert_called_once_with(revision.storage_path)
+
+    @patch("apps.projects.report_services.upload_report_document")
+    def test_report_structure_cannot_be_reordered_after_first_submission(self, upload_mock):
+        self.submit_section(section=self.section_one)
+        self.client.force_authenticate(self.coordinator)
+        response = self.client.patch(
+            f"/api/projects/report-sections/{self.section_two.pk}/",
+            {"sequence": 1},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectReportStorageHeaderTests(SimpleTestCase):
+    @patch("urllib.request.urlopen")
+    def test_current_supabase_secret_key_is_sent_as_apikey_only(self, urlopen_mock):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b"{}"
+        urlopen_mock.return_value = response
+        environment = {
+            "SUPABASE_URL": "https://storage-project.supabase.co",
+            "SUPABASE_SECRET_KEY": "sb_secret_test_key",
+            "PROJFLOW_REPORTS_BUCKET": "projflow-project-reports",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            _storage_request("GET", "bucket/projflow-project-reports")
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.get_header("Apikey"), "sb_secret_test_key")
+        self.assertIsNone(request.get_header("Authorization"))
+
+    @patch("urllib.request.urlopen")
+    def test_legacy_service_role_key_is_sent_as_apikey_and_bearer(self, urlopen_mock):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b"{}"
+        urlopen_mock.return_value = response
+        environment = {
+            "SUPABASE_URL": "https://storage-project.supabase.co",
+            "SUPABASE_SERVICE_ROLE_KEY": "legacy-service-role-jwt",
+            "PROJFLOW_REPORTS_BUCKET": "projflow-project-reports",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            _storage_request("GET", "bucket/projflow-project-reports")
+        request = urlopen_mock.call_args.args[0]
+        self.assertEqual(request.get_header("Apikey"), "legacy-service-role-jwt")
+        self.assertEqual(request.get_header("Authorization"), "Bearer legacy-service-role-jwt")

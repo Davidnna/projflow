@@ -6,7 +6,7 @@ import { Alert, EmptyState, LoadingState, PageHeader, StatCard, StatusBadge, get
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
 
-function CoordinatorOverview({ canManageMilestones }) {
+function CoordinatorOverview({ canManageReportStructure }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState("");
 
@@ -19,8 +19,8 @@ function CoordinatorOverview({ canManageMilestones }) {
             apiRequest(endpoints.lecturers),
             apiRequest(endpoints.assignments),
             apiRequest(endpoints.lecturerWorkloads),
-            apiRequest(endpoints.milestones),
-        ]).then(([sessions, roster, enrollments, lecturers, assignments, workloads, milestones]) => {
+            apiRequest(endpoints.reportSections),
+        ]).then(([sessions, roster, enrollments, lecturers, assignments, workloads, reportSections]) => {
             if (active) {
                 setData({
                     sessions: getList(sessions),
@@ -29,7 +29,7 @@ function CoordinatorOverview({ canManageMilestones }) {
                     lecturers: getList(lecturers),
                     assignments: getList(assignments),
                     workloads: getList(workloads),
-                    milestones: getList(milestones),
+                    reportSections: getList(reportSections),
                 });
             }
         }).catch((requestError) => {
@@ -87,7 +87,7 @@ function CoordinatorOverview({ canManageMilestones }) {
                         <Link to="/app/students" className="action-list-item"><span className="action-list-icon action-icon-blue">♙</span><span><strong>Manage student records</strong><small>Maintain the departmental student register</small></span><b>→</b></Link>
                         <Link to="/app/supervisors" className="action-list-item"><span className="action-list-icon action-icon-teal">⇄</span><span><strong>Allocate supervisors</strong><small>{unassigned.length} students awaiting allocation</small></span><b>→</b></Link>
                         <Link to="/app/lecturers" className="action-list-item"><span className="action-list-icon action-icon-violet">♧</span><span><strong>Manage lecturers</strong><small>Create and maintain lecturer accounts</small></span><b>→</b></Link>
-                        {canManageMilestones && <Link to="/app/milestones" className="action-list-item"><span className="action-list-icon action-icon-blue">⚑</span><span><strong>Set project milestones</strong><small>{data.milestones.filter((item) => activeSession && item.session === activeSession.id).length} milestones in the active session</small></span><b>→</b></Link>}
+                        {canManageReportStructure && <Link to="/app/report-structure" className="action-list-item"><span className="action-list-icon action-icon-blue">▤</span><span><strong>Configure project report</strong><small>{data.reportSections.filter((item) => activeSession && item.session === activeSession.id).length} report sections in the active session</small></span><b>→</b></Link>}
                     </div>
                 </section>
                 <section className="surface-card dashboard-panel">
@@ -182,7 +182,7 @@ function StudentOverview() {
                     {assignment && <Alert type="success">Your supervisor is {assignment.lecturer_name}.</Alert>}
                 </div>
             ) : <EmptyState title="Registration details unavailable" description="We couldn't retrieve your registration details. Please contact your department for assistance." />}
-            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Submit your proposed topic, follow your supervisor’s feedback and report progress at each project milestone.</p><div className="student-project-actions"><Link className="button button-primary" to="/app/topics">Open my project topic</Link><Link className="text-link" to="/app/my-progress">View project progress →</Link></div></div>
+            <div className="surface-card upcoming-card"><span className="panel-eyebrow">PROJECT INFORMATION</span><h2>Your project workspace</h2><p>Submit your proposed topic, upload each part of your project report and follow your supervisor’s feedback.</p><div className="student-project-actions"><Link className="button button-primary" to="/app/topics">Open my project topic</Link><Link className="text-link" to="/app/my-progress">View my project report →</Link></div></div>
         </>
     );
 }
@@ -190,7 +190,7 @@ function StudentOverview() {
 export default function DashboardOverview() {
     const { hasAnyRole } = useAuth();
     if (hasAnyRole(coordinatorRoles)) {
-        return <CoordinatorOverview canManageMilestones={hasAnyRole(["project_coordinator"])} />;
+        return <CoordinatorOverview canManageReportStructure={hasAnyRole(["project_coordinator"])} />;
     }
     if (hasAnyRole(["lecturer"])) {
         return <LecturerOverview />;
