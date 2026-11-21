@@ -10,7 +10,7 @@ permissions:
     contents: read
 
 env:
-    DJANGO_SECRET_KEY: "ci-only-not-for-production"
+    DJANGO_SECRET_KEY: "ci-only-not-for-production-use-a-32-character-or-longer-test-key"
 
 jobs:
     backend:

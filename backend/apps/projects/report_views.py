@@ -3,7 +3,7 @@ from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed, PermissionDenied, ValidationError
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
@@ -173,7 +173,7 @@ class ProjectReportSectionViewSet(viewsets.ModelViewSet):
 class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectReportSubmissionSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     http_method_names = ["get", "post", "head", "options"]
 
     def get_queryset(self):
