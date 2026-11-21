@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import os
 import re
 import urllib.error
@@ -16,6 +17,7 @@ SIGNED_URL_TTL_SECONDS = 300
 
 PDF_CONTENT_TYPE = "application/pdf"
 DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+logger = logging.getLogger(__name__)
 
 
 class ReportStorageError(Exception):
@@ -82,13 +84,27 @@ def read_report_document(uploaded_file):
 
 def _storage_configuration():
     base_url = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
-    api_key = (
-        os.environ.get("SUPABASE_SECRET_KEY", "").strip()
-        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-    )
+    secret_key = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+    legacy_service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    api_key = secret_key or legacy_service_role_key
     bucket = os.environ.get("PROJFLOW_REPORTS_BUCKET", "projflow-project-reports").strip()
-    if not base_url or not api_key or not bucket:
+    missing = []
+    if not base_url:
+        missing.append("SUPABASE_URL")
+    if not api_key:
+        missing.append("SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY")
+    if not bucket:
+        missing.append("PROJFLOW_REPORTS_BUCKET")
+    if missing:
+        logger.error(
+            "Private report storage configuration is incomplete; missing: %s",
+            ", ".join(missing),
+        )
         raise ReportStorageError("Private document storage is not configured.")
+    if secret_key and legacy_service_role_key:
+        logger.warning(
+            "Both Supabase storage key variables are configured; SUPABASE_SECRET_KEY takes precedence."
+        )
     return base_url, api_key, bucket
 
 
@@ -98,6 +114,12 @@ def _encoded_path(value):
 
 def _storage_request(method, endpoint, payload=None, content_type=None):
     base_url, api_key, _ = _storage_configuration()
+    key_source = (
+        "SUPABASE_SECRET_KEY"
+        if os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+        else "SUPABASE_SERVICE_ROLE_KEY"
+    )
+    route = endpoint.lstrip("/").split("/", 1)[0] or "unknown"
     headers = {"apikey": api_key}
     if not api_key.startswith("sb_secret_"):
         headers["Authorization"] = f"Bearer {api_key}"
@@ -125,14 +147,66 @@ def _storage_request(method, endpoint, payload=None, content_type=None):
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return {}
     except urllib.error.HTTPError as exc:
+        response_body = b""
+        try:
+            response_body = exc.read(4096)
+        except OSError:
+            pass
+        error_code = "unknown"
+        error_message = "No response details returned"
+        try:
+            error_payload = json.loads(response_body.decode("utf-8"))
+            if isinstance(error_payload, dict):
+                error_code = str(
+                    error_payload.get("code")
+                    or error_payload.get("error")
+                    or error_payload.get("error_code")
+                    or "unknown"
+                )[:100]
+                error_message = str(
+                    error_payload.get("message")
+                    or error_payload.get("msg")
+                    or error_payload.get("error_description")
+                    or error_payload.get("error")
+                    or error_message
+                )[:300]
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            if response_body:
+                error_message = response_body.decode("utf-8", errors="replace")[:300]
+        # Never log credentials, authorization headers, or uploaded document contents.
+        for sensitive_value in (api_key,):
+            if sensitive_value:
+                error_message = error_message.replace(sensitive_value, "[REDACTED]")
+        logger.error(
+            "Supabase Storage request failed: method=%s route=%s status=%s code=%s message=%s key_source=%s",
+            method,
+            route,
+            exc.code,
+            error_code,
+            error_message,
+            key_source,
+        )
         raise ReportStorageError("The document service could not complete the request.") from exc
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        reason = getattr(exc, "reason", exc)
+        logger.error(
+            "Supabase Storage network request failed: method=%s route=%s reason_type=%s key_source=%s",
+            method,
+            route,
+            type(reason).__name__,
+            key_source,
+        )
         raise ReportStorageError("The document service is temporarily unavailable.") from exc
 
 
 def _assert_private_bucket(bucket):
     details = _storage_request("GET", f"bucket/{urllib.parse.quote(bucket, safe='')}")
     if details.get("public") is not False:
+        logger.error(
+            "Supabase report bucket privacy check failed: bucket_public_value=%r metadata_contains_public=%s",
+            details.get("public"),
+            "public" in details,
+        )
         raise ReportStorageError("The project report storage bucket must be private.")
 
 

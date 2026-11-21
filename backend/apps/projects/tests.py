@@ -1,4 +1,7 @@
+import io
+import json
 import os
+import urllib.error
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -34,7 +37,7 @@ from .models import (
     ReportSubmissionStatus,
 )
 from .similarity import analyse_topic_similarity, lexical_similarity
-from .report_files import _storage_request
+from .report_files import ReportStorageError, _storage_request
 
 User = get_user_model()
 
@@ -1259,3 +1262,47 @@ class ProjectReportStorageHeaderTests(SimpleTestCase):
         request = urlopen_mock.call_args.args[0]
         self.assertEqual(request.get_header("Apikey"), "legacy-service-role-jwt")
         self.assertEqual(request.get_header("Authorization"), "Bearer legacy-service-role-jwt")
+
+    @patch("urllib.request.urlopen")
+    def test_storage_http_error_is_logged_with_status_and_without_secret(self, urlopen_mock):
+        secret = "sb_secret_do_not_log_this_value"
+        error_body = json.dumps({"statusCode": "401", "error": "Unauthorized", "message": "Invalid API key"}).encode("utf-8")
+        urlopen_mock.side_effect = urllib.error.HTTPError(
+            "https://storage-project.supabase.co/storage/v1/bucket/projflow-project-reports",
+            401,
+            "Unauthorized",
+            {},
+            io.BytesIO(error_body),
+        )
+        environment = {
+            "SUPABASE_URL": "https://storage-project.supabase.co",
+            "SUPABASE_SECRET_KEY": secret,
+            "PROJFLOW_REPORTS_BUCKET": "projflow-project-reports",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            with self.assertLogs("apps.projects.report_files", level="ERROR") as captured:
+                with self.assertRaises(ReportStorageError):
+                    _storage_request("GET", "bucket/projflow-project-reports")
+        output = "\n".join(captured.output)
+        self.assertIn("status=401", output)
+        self.assertIn("Invalid API key", output)
+        self.assertNotIn(secret, output)
+        self.assertIn("key_source=SUPABASE_SECRET_KEY", output)
+
+    @patch("urllib.request.urlopen")
+    def test_storage_network_error_logs_operation_without_credentials(self, urlopen_mock):
+        urlopen_mock.side_effect = urllib.error.URLError("connection refused")
+        environment = {
+            "SUPABASE_URL": "https://storage-project.supabase.co",
+            "SUPABASE_SERVICE_ROLE_KEY": "legacy-service-role-secret",
+            "PROJFLOW_REPORTS_BUCKET": "projflow-project-reports",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            with self.assertLogs("apps.projects.report_files", level="ERROR") as captured:
+                with self.assertRaises(ReportStorageError):
+                    _storage_request("POST", "object/projflow-project-reports/session/file.pdf")
+        output = "\n".join(captured.output)
+        self.assertIn("route=object", output)
+        self.assertIn("key_source=SUPABASE_SERVICE_ROLE_KEY", output)
+        self.assertNotIn("legacy-service-role-secret", output)
+
