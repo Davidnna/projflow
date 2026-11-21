@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest, endpoints, getList } from "../../api.js";
 import { Alert, EmptyState, Field, LoadingState, Modal, PageHeader, StatusBadge } from "../../components/dashboard/WorkspaceUI.jsx";
+import { triggerDownload } from "../../utils/download.js";
 
 const filters = [
     { value: "submitted", label: "Awaiting review" },
@@ -60,20 +61,12 @@ export default function ProgressReviewPage() {
     }
 
     async function downloadRevision(revision) {
-        const downloadWindow = window.open("about:blank", "_blank");
-        if (downloadWindow) downloadWindow.opener = null;
-        if (downloadWindow) downloadWindow.opener = null;
         setDownloadingId(revision.id);
         setError("");
         try {
             const result = await apiRequest(revision.download_path);
-            if (downloadWindow) {
-                downloadWindow.location = result.url;
-            } else {
-                window.location.assign(result.url);
-            }
+            triggerDownload(result.url, revision.original_filename);
         } catch (requestError) {
-            if (downloadWindow) downloadWindow.close();
             setError(requestError.message);
         } finally {
             setDownloadingId("");

@@ -308,7 +308,10 @@ class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
         if revision is None:
             raise ValidationError("The requested document could not be found.")
         try:
-            signed_url = create_report_download_url(revision.storage_path)
+            signed_url = create_report_download_url(
+                revision.storage_path,
+                download_filename=revision.original_filename,
+            )
         except ReportStorageError:
             return Response(
                 {"detail": "The document is temporarily unavailable for download."},

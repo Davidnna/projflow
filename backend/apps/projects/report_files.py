@@ -2,10 +2,10 @@ import io
 import json
 import logging
 import os
-import re
 import urllib.error
 import urllib.parse
 import urllib.request
+import unicodedata
 import uuid
 import zipfile
 from pathlib import Path
@@ -26,7 +26,13 @@ class ReportStorageError(Exception):
 
 def _safe_original_filename(value):
     filename = str(value or "document").replace("\\", "/").split("/")[-1].strip()
-    filename = re.sub(r"[^A-Za-z0-9._() -]", "_", filename)
+    filename = unicodedata.normalize("NFC", filename)
+    filename = "".join(
+        character
+        for character in filename
+        if not unicodedata.category(character).startswith("C")
+        and character not in {"/", "\\"}
+    ).strip()
     return (filename or "document")[:255]
 
 
@@ -232,7 +238,7 @@ def remove_report_document(object_path):
         return
 
 
-def create_report_download_url(object_path):
+def create_report_download_url(object_path, download_filename=None):
     _, _, bucket = _storage_configuration()
     _assert_private_bucket(bucket)
     endpoint = f"object/sign/{urllib.parse.quote(bucket, safe='')}/{_encoded_path(object_path)}"
@@ -245,13 +251,33 @@ def create_report_download_url(object_path):
     if not signed_url:
         raise ReportStorageError("The document could not be prepared for download.")
     if signed_url.startswith("https://") or signed_url.startswith("http://"):
-        return signed_url
-    base_url, _, _ = _storage_configuration()
-    if signed_url.startswith("/storage/v1/"):
-        return f"{base_url}{signed_url}"
-    if signed_url.startswith("/"):
-        return f"{base_url}/storage/v1{signed_url}"
-    return f"{base_url}/storage/v1/{signed_url.lstrip('/')}"
+        absolute_url = signed_url
+    else:
+        base_url, _, _ = _storage_configuration()
+        if signed_url.startswith("/storage/v1/"):
+            absolute_url = f"{base_url}{signed_url}"
+        elif signed_url.startswith("/"):
+            absolute_url = f"{base_url}/storage/v1{signed_url}"
+        else:
+            absolute_url = f"{base_url}/storage/v1/{signed_url.lstrip('/')}"
+
+    if not download_filename:
+        return absolute_url
+
+    safe_filename = _safe_original_filename(download_filename)
+    parsed_url = urllib.parse.urlsplit(absolute_url)
+    query_items = urllib.parse.parse_qsl(parsed_url.query, keep_blank_values=True)
+    query_items = [(key, value) for key, value in query_items if key != "download"]
+    query_items.append(("download", safe_filename))
+    return urllib.parse.urlunsplit(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            urllib.parse.urlencode(query_items),
+            parsed_url.fragment,
+        )
+    )
 
 
 def new_report_object_path(*, session_id, enrollment_id, section_id, extension):

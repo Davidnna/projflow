@@ -2,6 +2,7 @@ import io
 import json
 import os
 import urllib.error
+import urllib.parse
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -32,12 +33,18 @@ from .models import (
     ProjectTopicSimilarity,
     ProjectTopicStatus,
     SimilarityAnalysisStatus,
+    ProjectReportRevision,
     ProjectReportSection,
     ProjectReportSubmission,
     ReportSubmissionStatus,
 )
 from .similarity import analyse_topic_similarity, lexical_similarity
-from .report_files import ReportStorageError, _storage_request
+from .report_files import (
+    ReportStorageError,
+    _safe_original_filename,
+    _storage_request,
+    create_report_download_url,
+)
 
 User = get_user_model()
 
@@ -1056,6 +1063,27 @@ class ProjectReportSubmissionAPITests(APITestCase):
         self.assertEqual(revision.content_type, "application/pdf")
 
     @patch("apps.projects.report_services.upload_report_document")
+    def test_student_submission_preserves_unicode_original_filename(self, upload_mock):
+        original_filename = "Résumé – Preliminary Pages (Final).pdf"
+        self.client.force_authenticate(self.student)
+        response = self.client.post(
+            "/api/projects/report-submissions/",
+            {
+                "section": str(self.section_one.pk),
+                "file": self.make_pdf(original_filename),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(
+            response.data["latest_revision"]["original_filename"],
+            original_filename,
+        )
+        revision = ProjectReportRevision.objects.get(submission_id=response.data["id"])
+        self.assertEqual(revision.original_filename, original_filename)
+        upload_mock.assert_called_once()
+
+    @patch("apps.projects.report_services.upload_report_document")
     def test_student_cannot_submit_report_section_for_closed_session(self, upload_mock):
         self.session.status = AcademicSessionStatus.CLOSED
         self.session.save(update_fields=["status"])
@@ -1171,6 +1199,10 @@ class ProjectReportSubmissionAPITests(APITestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, ReportSubmissionStatus.SUBMITTED)
         self.assertEqual(submission.revisions.count(), 2)
+        self.assertEqual(
+            revision_response.data["latest_revision"]["original_filename"],
+            "preliminary-pages-revised.pdf",
+        )
         self.assertEqual(upload_mock.call_count, 2)
 
     @patch("apps.projects.report_services.upload_report_document")
@@ -1202,7 +1234,7 @@ class ProjectReportSubmissionAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, [])
 
-    @patch("apps.projects.report_views.create_report_download_url", return_value="https://storage.example/signed-document")
+    @patch("apps.projects.report_views.create_report_download_url", return_value="https://storage.example/signed-document?token=test&download=preliminary-pages.pdf")
     @patch("apps.projects.report_services.upload_report_document")
     def test_assigned_supervisor_can_request_short_lived_document_download(self, upload_mock, download_mock):
         submission = self.submit_section(section=self.section_one)
@@ -1212,9 +1244,15 @@ class ProjectReportSubmissionAPITests(APITestCase):
             f"/api/projects/report-submissions/{submission.pk}/revisions/{revision.pk}/download/"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["url"], "https://storage.example/signed-document")
+        self.assertEqual(
+            response.data["url"],
+            "https://storage.example/signed-document?token=test&download=preliminary-pages.pdf",
+        )
         self.assertEqual(response.data["expires_in"], 300)
-        download_mock.assert_called_once_with(revision.storage_path)
+        download_mock.assert_called_once_with(
+            revision.storage_path,
+            download_filename=revision.original_filename,
+        )
 
     @patch("apps.projects.report_services.upload_report_document")
     def test_report_structure_cannot_be_reordered_after_first_submission(self, upload_mock):
@@ -1229,6 +1267,36 @@ class ProjectReportSubmissionAPITests(APITestCase):
 
 
 class ProjectReportStorageHeaderTests(SimpleTestCase):
+    def test_original_filename_sanitization_preserves_unicode_and_removes_path(self):
+        self.assertEqual(
+            _safe_original_filename(r"C:\fakepath\Résumé – Chapter 1.pdf"),
+            "Résumé – Chapter 1.pdf",
+        )
+
+    @patch("apps.projects.report_files._storage_request")
+    def test_signed_download_url_requests_original_filename(self, storage_request_mock):
+        storage_request_mock.side_effect = [
+            {"public": False},
+            {"signedURL": "/object/sign/projflow-project-reports/session/document.pdf?token=signed-token"},
+        ]
+        environment = {
+            "SUPABASE_URL": "https://storage-project.supabase.co",
+            "SUPABASE_SECRET_KEY": "sb_secret_test_key",
+            "PROJFLOW_REPORTS_BUCKET": "projflow-project-reports",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            signed_url = create_report_download_url(
+                "session/document.pdf",
+                download_filename="Résumé – Preliminary Pages.pdf",
+            )
+
+        parsed_url = urllib.parse.urlsplit(signed_url)
+        query = urllib.parse.parse_qs(parsed_url.query)
+        self.assertEqual(parsed_url.netloc, "storage-project.supabase.co")
+        self.assertEqual(query["token"], ["signed-token"])
+        self.assertEqual(query["download"], ["Résumé – Preliminary Pages.pdf"])
+        self.assertEqual(storage_request_mock.call_count, 2)
+
     @patch("urllib.request.urlopen")
     def test_current_supabase_secret_key_is_sent_as_apikey_only(self, urlopen_mock):
         response = MagicMock()
