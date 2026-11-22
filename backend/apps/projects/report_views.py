@@ -12,6 +12,7 @@ from apps.academics.models import StudentEnrollment, StudentVerificationStatus, 
 
 from .models import (
     ProjectReportRevision,
+    ProjectReportReview,
     ProjectReportSection,
     ProjectReportSubmission,
     ReportReviewDecision,
@@ -188,13 +189,6 @@ class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
             "reviews__reviewer",
             "reviews__revision",
         )
-        if (
-            user.is_superuser
-            or user.has_role(RoleCode.ADMINISTRATOR)
-            or user.has_role(RoleCode.PROJECT_COORDINATOR)
-        ):
-            return queryset.none()
-
         filters = Q(pk__in=[])
         if user.has_role(RoleCode.STUDENT):
             filters |= Q(student_enrollment__user=user)
@@ -284,6 +278,7 @@ class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
                 actor=request.user,
                 decision=values["decision"],
                 feedback=values.get("feedback", ""),
+                annotation=values.get("annotation"),
             )
         except DjangoValidationError as exc:
             raise_api_validation_error(exc)
@@ -307,6 +302,9 @@ class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
         ).first()
         if revision is None:
             raise ValidationError("The requested document could not be found.")
+        from .report_serializers import can_access_current_report
+        if not can_access_current_report(submission, request.user) and not revision.reviews.filter(reviewer=request.user).exists():
+            raise PermissionDenied("You cannot access this document version.")
         try:
             signed_url = create_report_download_url(
                 revision.storage_path,
@@ -318,6 +316,21 @@ class ProjectReportSubmissionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response({"url": signed_url, "expires_in": 300})
+
+    @action(detail=True, methods=["get"], url_path=r"reviews/(?P<review_id>[^/.]+)/download")
+    def download_annotation(self, request, pk=None, review_id=None):
+        submission = self.get_object()
+        review = ProjectReportReview.objects.filter(pk=review_id, submission=submission).first()
+        if not review or not review.annotation_path:
+            raise ValidationError("The annotated document could not be found.")
+        from .report_serializers import can_access_current_report
+        if not can_access_current_report(submission, request.user) and review.reviewer_id != request.user.pk:
+            raise PermissionDenied("You cannot access this annotated document.")
+        try:
+            url = create_report_download_url(review.annotation_path, download_filename=review.annotation_filename)
+        except ReportStorageError:
+            return Response({"detail": "The annotated document is temporarily unavailable."}, status=503)
+        return Response({"url": url, "expires_in": 300})
 
     def destroy(self, request, *args, **kwargs):
         raise MethodNotAllowed("DELETE", detail="Submitted report records are retained for academic purposes.")

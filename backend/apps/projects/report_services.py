@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.academics.models import (
+    AcademicSession,
     AcademicSessionStatus,
     StudentEnrollment,
     StudentVerificationStatus,
@@ -12,6 +13,7 @@ from apps.academics.models import (
 )
 
 from .models import (
+    ProjectCompletion,
     ProjectReportRevision,
     ProjectReportReview,
     ProjectReportSection,
@@ -48,6 +50,8 @@ def _current_assignment(enrollment, actor=None):
 
 
 def _validate_section_is_unlocked(*, section, enrollment):
+    if ProjectCompletion.objects.filter(enrollment=enrollment).exclude(status__in=["revision_requested", "clearance_denied"]).exists():
+        raise ValidationError("Report sections are locked after final project submission.")
     previous_sections = ProjectReportSection.objects.filter(
         session=section.session,
         is_active=True,
@@ -130,6 +134,7 @@ def submit_report_section(*, actor, section_id, uploaded_file, submission_note="
     )
     try:
         with transaction.atomic():
+            AcademicSession.objects.select_for_update().get(pk=section.session_id)
             locked_section = ProjectReportSection.objects.select_for_update().select_related(
                 "session"
             ).get(pk=section.pk)
@@ -163,12 +168,15 @@ def submit_report_section(*, actor, section_id, uploaded_file, submission_note="
                 submission_note=submission_note.strip(),
                 uploaded_by=actor,
             )
+            from .lifecycle import notify
+            notify([current_assignment.lecturer.user_id], "reports", "A report section is awaiting your review.")
     except IntegrityError as exc:
         remove_report_document(object_path)
         raise ValidationError("A submission already exists for this report section.") from exc
     except Exception:
         remove_report_document(object_path)
         raise
+
     return submission
 
 
@@ -179,6 +187,8 @@ def resubmit_report_section(*, submission_id, actor, uploaded_file, submission_n
     ).filter(pk=submission_id).first()
     if submission is None:
         raise ValidationError("The report submission could not be found.")
+    if not submission.student_enrollment.is_verified:
+        raise ValidationError("A verified student registration is required to revise this report section.")
     if submission.student_enrollment.user_id != actor.id:
         raise ValidationError("You can only revise your own report submissions.")
     if submission.status != ReportSubmissionStatus.REVISION_REQUESTED:
@@ -203,12 +213,15 @@ def resubmit_report_section(*, submission_id, actor, uploaded_file, submission_n
     )
     try:
         with transaction.atomic():
+            AcademicSession.objects.select_for_update().get(pk=submission.section.session_id)
             locked_submission = ProjectReportSubmission.objects.select_for_update().select_related(
                 "student_enrollment",
                 "section__session",
             ).get(pk=submission.pk)
             if locked_submission.student_enrollment.user_id != actor.id:
                 raise ValidationError("You can only revise your own report submissions.")
+            if not locked_submission.student_enrollment.is_verified:
+                raise ValidationError("A verified student registration is required to revise this report section.")
             if locked_submission.status != ReportSubmissionStatus.REVISION_REQUESTED:
                 raise ValidationError("This report section is no longer awaiting a revision.")
             if (
@@ -252,20 +265,41 @@ def resubmit_report_section(*, submission_id, actor, uploaded_file, submission_n
                     "updated_at",
                 ]
             )
+            from .lifecycle import notify
+            notify([current_assignment.lecturer.user_id], "reports", "A revised report section is awaiting your review.")
     except Exception:
         remove_report_document(object_path)
         raise
+
     return locked_submission
 
 
-@transaction.atomic
-def review_report_section(*, submission_id, actor, decision, feedback=""):
+def review_report_section(*, submission_id, actor, decision, feedback="", annotation=None):
+    uploaded_paths = []
+    try:
+        with transaction.atomic():
+            return _review_report_section(submission_id, actor, decision, feedback, annotation, uploaded_paths)
+    except Exception:
+        for path in uploaded_paths:
+            remove_report_document(path)
+        raise
+
+
+def _review_report_section(submission_id, actor, decision, feedback, annotation, uploaded_paths):
+    session_id = ProjectReportSubmission.objects.filter(pk=submission_id).values_list("section__session_id", flat=True).first()
+    if session_id is None:
+        raise ValidationError("The report submission could not be found.")
+    AcademicSession.objects.select_for_update().get(pk=session_id)
     submission = ProjectReportSubmission.objects.select_for_update().select_related(
         "student_enrollment",
         "section",
     ).filter(pk=submission_id).first()
     if submission is None:
         raise ValidationError("The report submission could not be found.")
+    if submission.section.session.status != AcademicSessionStatus.ACTIVE:
+        raise ValidationError("This academic session is closed to report reviews.")
+    if decision not in ReportReviewDecision.values:
+        raise ValidationError("Select a valid review decision.")
     if submission.status != ReportSubmissionStatus.SUBMITTED:
         raise ValidationError("Only submitted report sections can be reviewed.")
 
@@ -279,6 +313,12 @@ def review_report_section(*, submission_id, actor, decision, feedback=""):
     if revision is None:
         raise ValidationError("The submitted document could not be found.")
 
+    annotation_values = {}
+    if annotation is not None:
+        from .lifecycle import upload_document
+        annotation_path, metadata = upload_document(annotation, submission.student_enrollment, "annotations")
+        uploaded_paths.append(annotation_path)
+        annotation_values = {"annotation_path": annotation_path, "annotation_filename": metadata["original_filename"]}
     ProjectReportReview.objects.create(
         submission=submission,
         revision=revision,
@@ -286,6 +326,7 @@ def review_report_section(*, submission_id, actor, decision, feedback=""):
         reviewer=actor,
         decision=decision,
         feedback=feedback.strip(),
+        **annotation_values,
     )
     submission.status = (
         ReportSubmissionStatus.APPROVED
@@ -294,4 +335,6 @@ def review_report_section(*, submission_id, actor, decision, feedback=""):
     )
     submission.reviewed_at = timezone.now()
     submission.save(update_fields=["status", "reviewed_at", "updated_at"])
+    from .lifecycle import notify
+    notify([submission.student_enrollment.user_id], "reports", "Your supervisor has reviewed a report section.")
     return submission

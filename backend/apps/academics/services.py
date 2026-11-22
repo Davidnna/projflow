@@ -156,6 +156,10 @@ def register_student(*, email, password, first_name, last_name, other_names, mat
             )
     except IntegrityError as exc:
         raise ValidationError("The email address or matriculation number is already registered.") from exc
+    from apps.projects.lifecycle import coordinators, notify
+    notify([user.pk], "registration", "Your project registration has been received.")
+    if verification_status == StudentVerificationStatus.PENDING_REVIEW:
+        notify(coordinators(), "registration", "A student registration requires manual review.")
     return user, enrollment
 
 
@@ -200,6 +204,8 @@ def review_student_enrollment(*, enrollment_id, actor, decision, notes=""):
             "review_notes",
         ]
     )
+    from apps.projects.lifecycle import notify
+    notify([enrollment.user_id], "registration", "Your project registration has been reviewed.")
     return enrollment
 
 
@@ -232,8 +238,9 @@ def create_lecturer_account(*, actor, email, password, first_name, last_name, st
 
 @transaction.atomic
 def assign_supervisor(*, enrollment_id, lecturer_id, actor):
-    enrollment = StudentEnrollment.objects.select_for_update().get(pk=enrollment_id)
+    enrollment = StudentEnrollment.objects.get(pk=enrollment_id)
     session = AcademicSession.objects.select_for_update().get(pk=enrollment.session_id)
+    enrollment = StudentEnrollment.objects.select_for_update().get(pk=enrollment_id)
     lecturer = LecturerProfile.objects.select_for_update().get(pk=lecturer_id)
 
     if session.status != AcademicSessionStatus.ACTIVE:
@@ -251,11 +258,14 @@ def assign_supervisor(*, enrollment_id, lecturer_id, actor):
         raise ValidationError("This student already has a supervisor. Use the reassignment action.")
 
     try:
-        return SupervisorAssignment.objects.create(
+        assignment = SupervisorAssignment.objects.create(
             student_enrollment=enrollment,
             lecturer=lecturer,
             assigned_by=actor,
         )
+        from apps.projects.lifecycle import notify
+        notify([enrollment.user_id, lecturer.user_id], "supervision", "A project supervisor assignment has been created.")
+        return assignment
     except IntegrityError as exc:
         raise ValidationError("A current supervisor assignment already exists for this student.") from exc
 
@@ -266,6 +276,10 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
     if not reason:
         raise ValidationError({"reason": "A reassignment reason is required."})
 
+    initial = SupervisorAssignment.objects.filter(pk=assignment_id, is_current=True).values_list("student_enrollment__session_id", flat=True).first()
+    if initial is None:
+        raise ValidationError("Only a current supervisor assignment can be reassigned.")
+    session = AcademicSession.objects.select_for_update().get(pk=initial)
     current_assignment = (
         SupervisorAssignment.objects.select_for_update()
         .select_related("student_enrollment")
@@ -275,9 +289,6 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
     if current_assignment is None:
         raise ValidationError("Only a current supervisor assignment can be reassigned.")
     new_lecturer = LecturerProfile.objects.select_for_update().get(pk=lecturer_id)
-    session = AcademicSession.objects.select_for_update().get(
-        pk=current_assignment.student_enrollment.session_id
-    )
     if session.status != AcademicSessionStatus.ACTIVE:
         raise ValidationError("Supervisor assignments can only be changed during the active academic session.")
     if current_assignment.lecturer_id == new_lecturer.id:
@@ -286,6 +297,10 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
         raise ValidationError("The selected lecturer is not active for supervision.")
     if not new_lecturer.user.has_role(RoleCode.LECTURER):
         raise ValidationError("The selected account does not have the Lecturer role.")
+
+    from apps.projects.models import ProjectCompletion
+    if ProjectCompletion.objects.filter(enrollment=current_assignment.student_enrollment, panel__members=new_lecturer).exists():
+        raise ValidationError("This lecturer is on the student's examination panel. Reallocate the panel before changing supervisors.")
 
     now = timezone.now()
     current_assignment.is_current = False
@@ -307,6 +322,8 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
             student_enrollment=current_assignment.student_enrollment,
             is_current=True,
         ).update(supervisor_assignment=new_assignment, updated_at=now)
+        from apps.projects.lifecycle import notify
+        notify([current_assignment.student_enrollment.user_id, new_lecturer.user_id, current_assignment.lecturer.user_id], "supervision", "A project supervisor assignment has changed.")
         return new_assignment
     except IntegrityError as exc:
         raise ValidationError("The supervisor assignment changed concurrently. Refresh and try again.") from exc

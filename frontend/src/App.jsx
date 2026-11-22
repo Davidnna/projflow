@@ -19,6 +19,8 @@ import TopicReviewPage from "./pages/lecturer/TopicReviewPage.jsx";
 import ProgressReviewPage from "./pages/lecturer/ProgressReviewPage.jsx";
 import ReportStructurePage from "./pages/coordinator/ReportStructurePage.jsx";
 import CoordinatorAccessPage from "./pages/coordinator/CoordinatorAccessPage.jsx";
+import CompletionPage from "./pages/dashboard/CompletionPage.jsx";
+import NotificationsPage from "./pages/dashboard/NotificationsPage.jsx";
 import ProgressPage from "./pages/student/ProgressPage.jsx";
 
 const coordinatorRoles = ["administrator", "project_coordinator"];
@@ -41,6 +43,10 @@ export default function App() {
                 <Route path="/app" element={<DashboardLayout />}>
                     <Route index element={<Navigate to="/app/overview" replace />} />
                     <Route path="overview" element={<DashboardOverview />} />
+                    <Route path="notifications" element={<NotificationsPage />} />
+                    <Route element={<ProtectedRoute roles={["project_coordinator", "lecturer", "student"]} />}>
+                        <Route path="completion" element={<CompletionPage />} />
+                    </Route>
                     <Route element={<ProtectedRoute roles={["student"]} />}>
                         <Route path="topics" element={<ProjectTopicPage />} />
                     </Route>

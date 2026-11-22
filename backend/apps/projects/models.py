@@ -544,6 +544,8 @@ class ProjectReportReview(models.Model):
     )
     decision = models.CharField(max_length=24, choices=ReportReviewDecision.choices)
     feedback = models.TextField(blank=True)
+    annotation_path = models.CharField(max_length=500, blank=True)
+    annotation_filename = models.CharField(max_length=255, blank=True)
     reviewed_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -558,3 +560,133 @@ class ProjectReportReview(models.Model):
 
     def __str__(self):
         return f"{self.submission_id}: {self.get_decision_display()}"
+
+
+class ProjectDeadline(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey("academics.AcademicSession", on_delete=models.PROTECT, related_name="project_deadlines")
+    kind = models.CharField(max_length=20)
+    due_date = models.DateField()
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="project_deadlines_updated")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["session", "kind"], name="pf_deadline_session_kind")]
+
+
+class DeadlineExtension(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    enrollment = models.ForeignKey("academics.StudentEnrollment", on_delete=models.PROTECT, related_name="deadline_extensions")
+    kind = models.CharField(max_length=80)
+    original_due_date = models.DateField()
+    requested_date = models.DateField()
+    justification = models.TextField()
+    status = models.CharField(max_length=20, default="pending")
+    decision_note = models.TextField(blank=True)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="extensions_decided")
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True)
+
+
+class AssessmentScheme(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey("academics.AcademicSession", on_delete=models.PROTECT, related_name="assessment_schemes")
+    lecturer = models.ForeignKey("academics.LecturerProfile", on_delete=models.PROTECT, related_name="assessment_schemes")
+    components = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["session", "lecturer"], name="pf_scheme_session_lecturer")]
+
+
+class DefencePanel(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey("academics.AcademicSession", on_delete=models.PROTECT, related_name="defence_panels")
+    name = models.CharField(max_length=150)
+    members = models.ManyToManyField("academics.LecturerProfile", related_name="defence_panels")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="defence_panels_created")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["session", "name"], name="pf_panel_session_name")]
+
+
+class ProjectCompletion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    enrollment = models.OneToOneField("academics.StudentEnrollment", on_delete=models.PROTECT, related_name="project_completion")
+    status = models.CharField(max_length=30, default="submitted")
+    panel = models.ForeignKey("DefencePanel", on_delete=models.PROTECT, null=True, related_name="projects")
+    defence_at = models.DateTimeField(null=True)
+    venue = models.CharField(max_length=200, blank=True)
+    components = models.JSONField(default=list)
+    score_round = models.PositiveIntegerField(default=1)
+    published_result = models.JSONField(default=dict)
+    published_at = models.DateTimeField(null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class FinalReportVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey("ProjectCompletion", on_delete=models.PROTECT, related_name="documents")
+    version = models.PositiveIntegerField()
+    storage_path = models.CharField(max_length=500, unique=True)
+    original_filename = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField()
+    content_type = models.CharField(max_length=150)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["project", "version"], name="pf_final_document_version")]
+
+
+class ExaminerScore(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey("ProjectCompletion", on_delete=models.PROTECT, related_name="scores")
+    examiner = models.ForeignKey("academics.LecturerProfile", on_delete=models.PROTECT, related_name="examination_scores")
+    round = models.PositiveIntegerField()
+    marks = models.JSONField(default=list)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["project", "examiner", "round"], name="pf_score_examiner_round")]
+
+
+class ResultAppeal(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey("ProjectCompletion", on_delete=models.PROTECT, related_name="appeals")
+    complaint = models.TextField()
+    status = models.CharField(max_length=20, default="pending")
+    panel_feedback = models.TextField(blank=True)
+    panel_reviewer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="appeals_reviewed")
+    decision_note = models.TextField(blank=True)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name="appeals_decided")
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True)
+    decided_at = models.DateTimeField(null=True)
+
+
+class CompletionEvent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey("ProjectCompletion", on_delete=models.PROTECT, related_name="events")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="completion_events")
+    action = models.CharField(max_length=40)
+    note = models.TextField(blank=True)
+    data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class ProjectNotification(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="project_notifications")
+    category = models.CharField(max_length=30)
+    message = models.CharField(max_length=500)
+    read_at = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class NotificationPreference(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="project_notification_preferences")
+    categories = models.JSONField(default=dict)

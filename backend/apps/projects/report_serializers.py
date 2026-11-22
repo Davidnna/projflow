@@ -141,6 +141,7 @@ class ProjectReportRevisionSerializer(serializers.ModelSerializer):
 class ProjectReportReviewSerializer(serializers.ModelSerializer):
     reviewer_name = serializers.CharField(source="reviewer.get_full_name", read_only=True)
     revision_number = serializers.IntegerField(source="revision.revision_number", read_only=True)
+    annotation_download_path = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectReportReview
@@ -151,8 +152,24 @@ class ProjectReportReviewSerializer(serializers.ModelSerializer):
             "feedback",
             "reviewer_name",
             "reviewed_at",
+            "annotation_filename",
+            "annotation_download_path",
         ]
         read_only_fields = fields
+
+    def get_annotation_download_path(self, obj):
+        if obj.annotation_path:
+            return f"/api/projects/report-submissions/{obj.submission_id}/reviews/{obj.pk}/download/"
+        return None
+
+
+def can_access_current_report(submission, user):
+    return bool(
+        (user.has_role(RoleCode.STUDENT) and submission.student_enrollment.user_id == user.pk)
+        or (user.has_role(RoleCode.LECTURER) and submission.student_enrollment.supervisor_assignments.filter(
+            is_current=True, lecturer__user=user, lecturer__is_active=True, lecturer__user__is_active=True,
+        ).exists())
+    )
 
 
 class ProjectReportSubmissionSerializer(serializers.ModelSerializer):
@@ -162,8 +179,8 @@ class ProjectReportSubmissionSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source="student_enrollment.user.get_full_name", read_only=True)
     matric_number = serializers.CharField(source="student_enrollment.matric_number", read_only=True)
     supervisor_name = serializers.SerializerMethodField()
-    revisions = ProjectReportRevisionSerializer(many=True, read_only=True)
-    reviews = ProjectReportReviewSerializer(many=True, read_only=True)
+    revisions = serializers.SerializerMethodField()
+    reviews = serializers.SerializerMethodField()
     latest_revision = serializers.SerializerMethodField()
     can_review = serializers.SerializerMethodField()
     can_resubmit = serializers.SerializerMethodField()
@@ -200,8 +217,24 @@ class ProjectReportSubmissionSerializer(serializers.ModelSerializer):
             assignment = obj.supervisor_assignment
         return assignment.lecturer.user.get_full_name()
 
+    def visible_revisions(self, obj):
+        request = self.context.get("request")
+        if request is None or can_access_current_report(obj, request.user):
+            return obj.revisions.all()
+        return obj.revisions.filter(reviews__reviewer=request.user).distinct()
+
+    def get_revisions(self, obj):
+        return ProjectReportRevisionSerializer(self.visible_revisions(obj), many=True).data
+
+    def get_reviews(self, obj):
+        request = self.context.get("request")
+        reviews = obj.reviews.all()
+        if request is not None and not can_access_current_report(obj, request.user):
+            reviews = reviews.filter(reviewer=request.user)
+        return ProjectReportReviewSerializer(reviews, many=True).data
+
     def get_latest_revision(self, obj):
-        revision = obj.revisions.order_by("-revision_number").first()
+        revision = self.visible_revisions(obj).order_by("-revision_number").first()
         if revision is None:
             return None
         return ProjectReportRevisionSerializer(revision).data
@@ -212,6 +245,7 @@ class ProjectReportSubmissionSerializer(serializers.ModelSerializer):
             request
             and request.user.is_authenticated
             and request.user.has_role(RoleCode.LECTURER)
+            and obj.section.session.status == AcademicSessionStatus.ACTIVE
             and obj.status == "submitted"
             and obj.student_enrollment.supervisor_assignments.filter(
                 is_current=True,
@@ -255,6 +289,12 @@ class ReportRevisionUploadSerializer(serializers.Serializer):
 
 
 class ReportReviewActionSerializer(serializers.Serializer):
+    annotation = serializers.FileField(required=False, write_only=True)
+
+    def validate_annotation(self, value):
+        inspect_report_document(value)
+        return value
+
     decision = serializers.ChoiceField(choices=ReportReviewDecision.choices)
     feedback = serializers.CharField(required=False, allow_blank=True, max_length=5000)
 

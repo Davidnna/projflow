@@ -183,6 +183,7 @@ def _storage_request(method, endpoint, payload=None, content_type=None):
         for sensitive_value in (api_key,):
             if sensitive_value:
                 error_message = error_message.replace(sensitive_value, "[REDACTED]")
+                error_code = error_code.replace(sensitive_value, "[REDACTED]")
         logger.error(
             "Supabase Storage request failed: method=%s route=%s status=%s code=%s message=%s key_source=%s",
             method,

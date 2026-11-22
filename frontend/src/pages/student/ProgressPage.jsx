@@ -39,6 +39,7 @@ function ReportHistory({ submission, onDownload }) {
                         <article key={review.id}>
                             <div><strong>{review.decision === "approve" ? "Section approved" : "Revision requested"}</strong><span>{new Date(review.reviewed_at).toLocaleDateString()}</span></div>
                             {review.feedback && <p>{review.feedback}</p>}
+                            {review.annotation_download_path && <button type="button" className="table-action table-action--primary" onClick={() => onDownload({ id: review.id, download_path: review.annotation_download_path, original_filename: review.annotation_filename })}>Download annotated copy: {review.annotation_filename}</button>}
                         </article>
                     ))}
                 </div>
@@ -115,7 +116,7 @@ export default function ProgressPage() {
         });
         return unlocked;
     }, [sessionSections, submissionsBySection]);
-    const approvedCount = sessionSubmissions.filter((item) => item.status === "approved").length;
+    const approvedCount = sessionSections.filter((section) => section.is_active && section.is_required && submissionsBySection.get(section.id)?.status === "approved").length;
     const requiredCount = sessionSections.filter((item) => item.is_active && item.is_required).length;
 
     function openSubmit(section, submission = null) {

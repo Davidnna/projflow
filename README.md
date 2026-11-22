@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `0.3.15`
+- **Current release:** `1.0.0-rc.1` (consolidated acceptance-testing candidate)
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -178,17 +178,23 @@ Release `0.1.0` established the branded React application, Django API, custom us
 - Students can access only their own report sections and submissions. Supervisors can access submissions from currently assigned students and submissions they previously reviewed. Administrators and Project Coordinators cannot access individual report documents through these APIs.
 - Existing milestone and progress-report tables and endpoints are retained as legacy records; the current student and supervisor interfaces use the new report-section workflow.
 
-### Not implemented yet
+### Release 1.0.0-rc.1 (consolidated project completion)
 
-The following modules are planned for later development and must not be treated as operational features in this release:
+This release candidate extends the working 0.3.15 release with the remaining core project-cycle workflows. It retains all existing migrations, user records, private report objects and document revision history. Migration `projects/0005_completion_workflows.py` adds new tables and nullable/blank annotation metadata; it does not reset the database. The release is intended for departmental acceptance testing, not an assertion that production validation has already passed.
 
-- Inline document annotations, tracked changes and page-level comments on uploaded report documents.
-- Session-specific project deadlines and extension requests.
-- Final-project recommendation and departmental defence clearance.
-- Examination panels, defence scheduling and supervisor conflict-of-interest checks.
-- Supervisor-configured assessment templates, examiner scoring, result approval, publication and appeals.
-- In-app and email notifications with user-controlled preferences for each notification category.
-- Advanced project-specific dashboards for topic review, submissions, progress monitoring, examinations and results.
+| Module | Implemented workflow |
+|---|---|
+| Supervision | Optional annotated PDF/DOCX uploads on supervisor decisions; authorised direct download of the exact annotated version. |
+| Deadlines | Session-wide topic/final/defence deadlines and individual chapter due dates, extension requests, Coordinator decisions and effective deadlines. Deadline status is advisory; late submissions are not automatically prohibited. |
+| Completion | Complete PDF/DOCX report submission after topic and all required section approvals, immutable report versions, supervisor recommendation/revision and Coordinator clearance. |
+| Defence | Session-specific panels, active examiner selection, student allocation, date/time and venue, supervisor exclusion and exact-time examiner collision checks. Panel membership is immutable after allocation; a different panel may be allocated before any scores exist. |
+| Assessment | One supervisor assessment structure per session, component maxima sum to 100, frozen structure per allocated defence, bounded independent examiner marks and complete correction rounds. |
+| Results | Coordinator-only aggregate review, correction, explicit approval and publication; students see published component averages and total only. |
+| Appeals | 14-day window from first publication, panel response, Coordinator determination, recorded score correction and republication. Previously published scores remain visible until corrected results are published. |
+| Notifications | In-app inbox and per-category channel preferences; optional SMTP email delivery after committed events. |
+| Dashboards | Role-scoped completion summary, searchable project progress register, deadlines/extensions, assessment, panels and results in the Final project & defence workspace. |
+
+Existing decisions take precedence over earlier draft requirements: sequential report-section approval, PDF/DOCX only, 20 MB per uploaded document, and manual academic session activation/closure. Annotated feedback consists of uploaded corrected documents rather than a browser document editor. Other historical file formats, inline annotation editing and supporting-file bundles are not included in this candidate. Email delivery is optional and requires a working SMTP service; it is not verified by deploying the application alone. Final go-live requires passing CI, live acceptance testing, production backup and security review.
 
 ## 2. Technology stack
 
@@ -279,7 +285,7 @@ The Coordinator can approve or reject a registration requiring manual review. Re
 - Only the currently assigned supervisor approves, requests revision or rejects a topic. The Project Coordinator does not make topic decisions.
 - A revision request must include written feedback. The student can revise and resubmit, with each submitted version and supervisor decision retained in the history. A rejected proposal remains in the historical record, and the student may submit a new proposal.
 - Potentially similar topics will be compared against all submitted proposals from current and previous academic sessions, regardless of approval status. The comparison covers title, abstract, problem statement, research objectives and keywords. A local hybrid keyword/semantic engine (no external AI API) will use fixed system thresholds. The assigned supervisor alone will see potential matches, similarity percentages, previous project title/session/status and matched sections; complete historical project documents will not be exposed. Similarity findings will be advisory and will not automatically reject a proposal.
-- Students can submit chapters in any order; chapter approval is not a prerequisite for submitting another chapter.
+- Students submit report sections in the Coordinator-defined sequence. Approval of earlier required sections (and any submitted optional sections) unlocks subsequent sections.
 - Supervisors provide both written feedback and annotated document uploads.
 
 ### 5.4 Milestones and progress monitoring (implemented in 0.3.9)
@@ -292,15 +298,15 @@ The Coordinator can approve or reject a registration requiring manual review. Re
 - Progress reports currently contain text fields only. Supporting-file uploads are deferred until private persistent document storage is integrated; Render's ephemeral filesystem is not used for student documents.
 - Students see their own reports and feedback. Supervisors see reports for their assigned students and historical reports they reviewed. The Coordinator manages the common milestone structure but does not access individual progress report content through the progress-report API.
 
-### 5.5 Project deadlines and extensions (planned)
+### 5.5 Project deadlines and extensions
 
 - The Project Coordinator sets project-topic, chapter, final-submission and defence-related deadlines for each session. Students may request individual extensions before or after the original deadline, with a mandatory justification and proposed new date. The Coordinator approves or rejects each request; a request does not itself change the deadline.
 
-### 5.6 Final submission, defence and results (planned)
+### 5.6 Final submission, defence and results
 
 1. The student submits the complete project to the supervisor.
 2. The supervisor recommends or declines to recommend the student for defence.
-3. The Project Coordinator gives or withholds final departmental clearance.
+3. The Project Coordinator gives or withholds final departmental clearance. If clearance is withheld, the student can submit a revised complete document for another supervisor recommendation.
 4. The Coordinator creates examination panels, assigns lecturers and allocates cleared students.
 5. A student's supervisor cannot sit on the panel examining that student's project.
 6. Each panel member independently scores every configured assessment component.
@@ -310,7 +316,7 @@ The Coordinator can approve or reject a registration requiring manual review. Re
 10. Students see the overall score and component averages, not individual examiner scores.
 11. Students may appeal within 14 days of publication. The panel reviews the complaint and the Coordinator makes the final decision. Any approved appeal-related score change follows the recorded correction and Coordinator-approval process.
 
-Each supervisor configures one assessment structure for all students assigned to that supervisor in the academic session. Component maxima must sum to exactly 100. The supervisor configures the structure but does not award the marks; examination panel members do.
+Each supervisor configures one assessment structure for all students assigned to that supervisor in the academic session. Component maxima are positive integers and must sum to exactly 100. The supervisor configures the structure but does not award the marks; examination panel members do. The structure is snapshotted at allocation. Scores accept up to two decimal places. Each correction round requires every panel member to submit or reconfirm their own marks. Averages use unrounded underlying scores; displayed component averages and total are independently rounded to two decimal places. Once a result has been published, permitted appeals and their correction rounds remain available even if the session is closed.
 
 ## 6. Academic administration API
 
@@ -441,6 +447,19 @@ Administrators can grant or remove the Project Coordinator role for active Admin
 
 A student can submit one report per milestone in their academic session. If a supervisor requests revision, the student can submit a new numbered revision without losing the previous submission or review history. Milestone order is unique within a session. Milestone records are not deleted; the Coordinator can deactivate them. Once a milestone has progress reports, its session, order, title, description and expected achievement cannot be changed, although its optional due date and availability can be updated. Individual report content is not exposed to Coordinator or Administrator progress-report endpoints.
 
+### Completion and notification APIs (1.0.0-rc.1)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/projects/completion/?session={id}` | Role-scoped session, progress, deadline and completion workspace |
+| POST | `/api/projects/completion/` | Validated workflow action; includes `action` and `session` plus action-specific fields |
+| GET | `/api/projects/final-documents/{id}/download/` | Authorised signed download of a final report version |
+| POST | `/api/projects/report-submissions/{id}/review/` | JSON or multipart review, with optional `annotation` file in multipart |
+| GET | `/api/projects/report-submissions/{id}/reviews/{review_id}/download/` | Authorised annotated feedback download |
+| GET/POST | `/api/projects/notifications/` | User-scoped notifications, read status and preferences |
+
+Completion actions: `set_deadline`, `request_extension`, `approve_extension`, `reject_extension`, `save_scheme`, `create_panel`, `update_panel`, `submit`, `recommend`, `decline`, `clear`, `deny_clearance`, `schedule`, `score`, `return_result`, `approve_result`, `publish`, `appeal`, `review_appeal`, `accept_appeal`, `reject_appeal`. The final submission action uses multipart form data (`file`, optional `note`); other completion actions use JSON. The UI presents the available actions for each role and state; API permissions and transitions are enforced independently.
+
 ## 7. Data model introduced across releases
 
 | Entity | Purpose and important integrity rules |
@@ -461,6 +480,11 @@ A student can submit one report per milestone in their academic session. If a su
 | `ProjectProgressReport` | One student report per milestone and enrolment, linked to the supervisor assignment |
 | `ProjectProgressRevision` | Numbered snapshots of student progress-report submissions |
 | `ProjectProgressReview` | Supervisor decision, assessment and feedback linked to the exact progress revision reviewed |
+| `ProjectDeadline`, `DeadlineExtension` | Session due dates and individual extension decisions |
+| `AssessmentScheme`, `DefencePanel` | Supervisor assessment template and examination panel membership |
+| `ProjectCompletion`, `FinalReportVersion` | Clearance, defence allocation and final report version history |
+| `ExaminerScore`, `ResultAppeal`, `CompletionEvent` | Independent marks by round, appeals and immutable workflow history |
+| `ProjectNotification`, `NotificationPreference` | User-specific inbox and channel preferences |
 | `User`, `Role`, `UserRole` | Existing UUID-based account model, global roles and role assignments |
 
 Sensitive changes are performed through transactional service functions. Academic session, roster, enrolment and assignment records are retained rather than silently overwritten.
@@ -475,8 +499,9 @@ Sensitive changes are performed through transactional service functions. Academi
 - Lecturer profile deactivation prevents new supervisor allocations while retaining the user account and historical assignments; this avoids disabling a user who may hold another global role.
 - Roster imports are validated before commit and have a 10 MB/5,000-row limit.
 - Similarity embeddings and match records are internal academic-review data. They are not returned to student or Coordinator endpoints; the similarity report is authorised only for the currently assigned supervisor.
-- Future academic document storage will use private Supabase Storage buckets. PostgreSQL will store metadata and object references, not document binaries. Django will authorise every upload/download and issue short-lived access links. Access is limited to the student, their assigned supervisor, the Project Coordinator and examination panel members assigned to that student.
-- Future project submissions will have one mandatory primary document and up to five optional supporting files. Each file will be limited to 20 MB. Permitted formats will be fixed by the system for each submission category and cannot be changed through the user interface: proposals/chapters/revisions/annotated feedback/final reports accept PDF, DOC and DOCX; defence presentations accept PPTX and PDF; supplementary materials accept PDF, DOC, DOCX, XLSX, JPG, JPEG and PNG.
+- Academic document storage uses the existing private Supabase bucket. PostgreSQL retains document metadata and opaque object references. Django authorises each download; time-limited signed URLs retain the original filename. Section documents remain restricted to the student and current supervisor, with former supervisors limited to the versions and feedback they reviewed. Final project documents are available to the student, current supervisor, Coordinator and allocated examiners.
+- PDF and DOCX are the agreed current formats; each uploaded report or annotated document may not exceed 20 MB. Document checks include extension, signature and DOCX archive validation. These checks do not constitute malware scanning; institutions should establish an appropriate endpoint/document-security policy.
+- Result scores and feedback are separate from student-facing published results; examiners can retrieve only their own marks. Coordinator result review shows aggregate marks, not individual examiner scores. Every accepted score submission remains in its recorded round.
 - Real student records, project documents, credentials and examination data must never be committed to this repository.
 
 ## 9. Local development setup
@@ -704,6 +729,37 @@ The Django API validates PDF/DOCX file signatures and size before upload. It sto
 ### 10.7 Supabase activity keep-alive workflow
 
 The repository includes `.github/workflows/supabase-keepalive.yml`. It calls the deployed `/api/ready/` endpoint twice daily and can also be run manually. Configure the GitHub Actions repository variable `PROJFLOW_READINESS_URL` with the exact Render readiness URL after deployment. The workflow does not contain database credentials and is best-effort, not a guarantee against Supabase pausing.
+
+### 10.8 Optional email notifications
+
+In-app notifications work with the existing deployment and no additional variables. To enable email, configure a working SMTP provider on Render (only the backend):
+
+| Variable | Value |
+|---|---|
+| `PROJFLOW_EMAIL_ENABLED` | `true` (omit or `false` to disable) |
+| `EMAIL_HOST` | SMTP hostname supplied by the provider |
+| `EMAIL_PORT` | Provider's SMTP port, normally 587 |
+| `EMAIL_HOST_USER` | Provider login |
+| `EMAIL_HOST_PASSWORD` | Provider secret |
+| `EMAIL_USE_TLS` | `true` for STARTTLS |
+| `DEFAULT_FROM_EMAIL` | Provider-verified sender address |
+
+Each user can enable email for chosen categories in Notifications. Email contains a generic sign-in prompt, not private grades or attachments. Delivery is best-effort after a successful database transaction; failures are logged without credentials. Hosting plans may restrict SMTP, so verify delivery with the chosen provider before relying on it. In-app notifications remain the primary channel.
+
+### 10.9 Release acceptance checklist (live deployment)
+
+1. Back up the Supabase database and Storage; preserve the current 0.3.15 Git commit as a rollback point. Confirm GitHub Actions passes backend system checks, migration consistency, all tests and frontend build. Render should apply migration 0005 on startup. No new bucket is needed.
+2. Sign in with Coordinator, supervisor, two other active lecturer accounts (examiners) and a verified test student. Confirm existing registrations, report sections, reviews and downloads still work. Use a dedicated test student/session or synthetic test records, not real marks.
+3. Download a student's report with spaces/Unicode in its filename; confirm original filename and no new tab. Request revision with written feedback and an annotated PDF/DOCX. Student downloads the annotation, resubmits and receives approval; verify required sequence and version history.
+4. Set topic/chapter/final/defence deadlines. Student requests an extension with a justification; confirm effective deadline changes only after Coordinator approval. Reject another request and confirm no extension. Check progress register overdue status.
+5. Approve the student's project topic and all required report sections. Submit complete PDF/DOCX, request revision, resubmit, recommend and clear. Verify student cannot bypass any gate and other students cannot download the document.
+6. Supervisor saves assessment components totaling 100. Reject invalid totals. Coordinator creates a panel with two other lecturers; scheduling a panel containing the student's supervisor must fail. Allocate a valid panel, date/time and venue. Use a near-future test appointment and submit scores after it begins. Check both assigned examiners and student see the schedule.
+7. Each examiner submits marks independently. Reject excessive or repeated marks; confirm an unauthorised lecturer cannot score. Verify Coordinator cannot approve until all assigned examiners submit. Return the result for correction and verify each examiner can submit only their own new marks. Compare computed averages to manual calculation.
+8. Approve then publish results. Students must not see draft marks or individual examiner scores. Submit an appeal, record panel feedback, accept or reject through the Coordinator. If accepted, repeat scoring, approval and publication; verify old published result remains visible during correction.
+9. Verify the Notifications inbox, unread status, category preferences and delivery if SMTP is configured. Test role-specific access, session isolation and historical record access. Confirm no secrets or private documents are exposed by API responses.
+10. Close a completed test session manually, confirm ordinary writes are disabled and an otherwise eligible published-result appeal can still be processed. Record failures, repair and rerun acceptance before institutional use.
+
+CI/runtime verification status at packaging: source syntax, relative frontend imports, migration field source comparison, five standalone assessment-calculation checks and ZIP integrity checked. The full suite contains 113 authored test methods. Django/DRF and Vite packages were unavailable in the packaging environment; full Django tests, migration autodetection and the production Vite build must be run by CI. Do not treat the candidate as verified for production until these and the live acceptance tests pass.
 
 ## 11. Branding
 

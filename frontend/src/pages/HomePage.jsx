@@ -46,6 +46,7 @@ const capabilities = [
         title: "Role-based workspaces",
         description: "Give students, lecturers and departmental administrators access to the tools relevant to their responsibilities.",
     },
+    { number: "10", title: "Final defence and assessment", description: "Coordinate clearance, examination panels, independent scores, result approval and appeals." },
 ];
 
 const workflow = [
@@ -58,6 +59,9 @@ const workflow = [
     ["07", "Supervisors review proposals", "The assigned supervisor approves, requests a revision or rejects the proposal."],
     ["08", "Potentially related topics are identified", "The assigned supervisor can review potential matches with previous academic proposals."],
     ["09", "Project reports are reviewed", "Students upload each report section separately, and supervisors approve sections or request revisions."],
+    ["10", "Final reports are cleared", "Supervisors recommend completed projects and the Coordinator decides departmental clearance."],
+    ["11", "Defences and assessment", "Assigned examiners score projects independently and the Coordinator approves results."],
+    ["12", "Results and appeals", "Published component averages and overall marks are available to students, with a 14-day appeal window."],
 ];
 
 const audiences = [
@@ -95,7 +99,7 @@ export default function HomePage() {
                         <h1>Bring your department's project work into <span>one clear process.</span></h1>
                         <p>
                             ProjFlow helps academic departments organise academic sessions, student records,
-                            student registration, supervisor assignments, project-topic review, topic similarity findings and chapter-by-chapter report submissions in one place.
+                            student registration, supervisor assignments, project review, final reports, defence and assessment in one place.
                         </p>
                         <div className="public-hero-actions">
                             <Link className="public-button public-button-primary" to="/features">Explore the features <span aria-hidden="true">→</span></Link>

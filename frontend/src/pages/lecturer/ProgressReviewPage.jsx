@@ -27,6 +27,7 @@ export default function ProgressReviewPage() {
     const [selected, setSelected] = useState(null);
     const [decision, setDecision] = useState("approve");
     const [feedback, setFeedback] = useState("");
+    const [annotation, setAnnotation] = useState(null);
 
     const loadSubmissions = useCallback(async () => {
         setLoading(true);
@@ -57,6 +58,7 @@ export default function ProgressReviewPage() {
         setSelected(submission);
         setDecision("approve");
         setFeedback("");
+        setAnnotation(null);
         setError("");
     }
 
@@ -83,9 +85,12 @@ export default function ProgressReviewPage() {
         setError("");
         setSuccess("");
         try {
+            const body = new FormData();
+            body.append("decision", decision);
+            body.append("feedback", feedback);
+            if (annotation) body.append("annotation", annotation);
             await apiRequest(`${endpoints.reportSubmissions}${selected.id}/review/`, {
-                method: "POST",
-                body: { decision, feedback },
+                method: "POST", body, formData: true, timeout: 120000,
             });
             setSuccess(decision === "request_revision" ? "Revision requested successfully." : "Report section approved successfully.");
             setSelected(null);
@@ -161,6 +166,7 @@ export default function ProgressReviewPage() {
                                     <article className="report-review-history-entry" key={review.id}>
                                         <div><strong>{review.decision === "approve" ? "Section approved" : "Revision requested"}</strong><span>{review.reviewer_name} · {new Date(review.reviewed_at).toLocaleDateString()}</span></div>
                                         {review.feedback && <p>{review.feedback}</p>}
+                                        {review.annotation_download_path && <button type="button" className="table-action table-action--primary" onClick={() => downloadRevision({ id: review.id, download_path: review.annotation_download_path, original_filename: review.annotation_filename })}>Download annotated copy: {review.annotation_filename}</button>}
                                     </article>
                                 ))}
                             </section>
@@ -171,6 +177,7 @@ export default function ProgressReviewPage() {
                             {error && <Alert type="error" onClose={() => setError("")}>{error}</Alert>}
                             <Field label="Decision"><select value={decision} onChange={(event) => setDecision(event.target.value)}><option value="approve">Approve section</option><option value="request_revision">Request revision</option></select></Field>
                             <Field label="Feedback" hint={decision === "request_revision" ? "Explain the corrections the student must make." : "Add any academic comments or recommendations (optional)."}><textarea rows="4" maxLength="5000" required={decision === "request_revision"} value={feedback} onChange={(event) => setFeedback(event.target.value)} /></Field>
+                            <Field label="Annotated document (optional)" hint="Upload a corrected PDF or DOCX, up to 20 MB."><input type="file" accept=".pdf,.docx" onChange={(event) => setAnnotation(event.target.files[0] || null)} /></Field>
                             <div className="modal-actions"><button type="button" className="button button-secondary" onClick={() => setSelected(null)}>Close</button><button className="button button-primary" disabled={saving}>{saving ? "Saving…" : decision === "approve" ? "Approve section" : "Request revision"}</button></div>
                         </form>
                     )}

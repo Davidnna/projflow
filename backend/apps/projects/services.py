@@ -91,6 +91,8 @@ def submit_project_topic(*, actor, data):
         _create_revision(topic=topic, actor=actor, revision_number=1)
     except IntegrityError as exc:
         raise ValidationError("A project topic is already active for your registration. Refresh and try again.") from exc
+    from .lifecycle import notify
+    notify([assignment.lecturer.user_id], "topics", "A new project topic is awaiting your review.")
     return topic
 
 
@@ -142,6 +144,8 @@ def resubmit_project_topic(*, topic_id, actor, data):
     )
     revision_number = topic.revisions.count() + 1
     _create_revision(topic=topic, actor=actor, revision_number=revision_number)
+    from .lifecycle import notify
+    notify([assignment.lecturer.user_id], "topics", "A revised project topic is awaiting your review.")
     return topic
 
 
@@ -192,4 +196,6 @@ def review_project_topic(*, topic_id, actor, decision, feedback=""):
         topic.is_current = False
     topic.reviewed_at = timezone.now()
     topic.save(update_fields=["status", "is_current", "reviewed_at", "updated_at"])
+    from .lifecycle import notify
+    notify([topic.student_enrollment.user_id], "topics", "Your supervisor has reviewed your project topic.")
     return topic

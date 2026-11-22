@@ -92,6 +92,24 @@ const featureGroups = [
             "Project Coordinators and Administrators manage departmental records and assignments.",
         ],
     },
+    {
+        number: "10",
+        title: "Deadlines and final report clearance",
+        intro: "Track deadlines, approved extensions and final-project readiness.",
+        points: ["Request and decide individual deadline extensions.", "Submit the complete project after required sections and the topic are approved.", "Record supervisor recommendations and departmental defence clearance."],
+    },
+    {
+        number: "11",
+        title: "Defence, assessment and results",
+        intro: "Organise independent examination and accountable result publication.",
+        points: ["Create examination panels, exclude the student's supervisor and schedule defences.", "Configure assessment components, record independent examiner marks and calculate averages.", "Approve and publish results, review appeals and record score corrections."],
+    },
+    {
+        number: "12",
+        title: "Notifications and progress monitoring",
+        intro: "Follow academic updates and project milestones in role-specific workspaces.",
+        points: ["Download annotated feedback and retain revision history.", "Track student progress and overdue activities.", "Review in-app notifications and configure notification preferences."],
+    },
 ];
 
 export default function FeaturesPage() {
@@ -103,7 +121,7 @@ export default function FeaturesPage() {
                     <h1>The essential tools for organised project administration.</h1>
                     <p>
                         ProjFlow brings together academic sessions, student onboarding, supervisor allocation,
-                        project-topic review, historical topic similarity checks and chapter-by-chapter project report submissions.
+                        project-topic review, report submission, final defence, assessment and results.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/how-it-works">See how it works <span aria-hidden="true">→</span></Link>
@@ -130,7 +148,7 @@ export default function FeaturesPage() {
                     </div>
                     <p className="public-feature-note">
                         ProjFlow's available features cover academic administration, student onboarding, supervisor
-                        coordination, project-topic review, supervisor-only similarity findings and project report submission and review. Access to each workspace depends on the user's role.
+                        coordination, project review, final defence, assessment and publication. Access to each workspace depends on the user's role.
                     </p>
                 </div>
             </section>

@@ -61,6 +61,24 @@ const steps = [
         description: "The Coordinator defines the report structure for the academic session. Students upload each section separately, and the assigned supervisor approves it or requests revisions before the next required section is unlocked.",
         owner: "Project Coordinator, student and assigned supervisor",
     },
+    {
+        number: "11",
+        title: "The complete project is submitted and cleared",
+        description: "Students submit the complete report after the required approvals. Their supervisor recommends them for defence and the Coordinator grants departmental clearance.",
+        owner: "Student, supervisor and Project Coordinator",
+    },
+    {
+        number: "12",
+        title: "Examination panels assess projects",
+        description: "The Coordinator schedules a conflict-free panel. Examiners submit independent marks against the supervisor's assessment structure.",
+        owner: "Project Coordinator and examination panel",
+    },
+    {
+        number: "13",
+        title: "Results are published and appeals are reviewed",
+        description: "The Coordinator approves the aggregated results before publication. Students see their component averages and total and may appeal within 14 days.",
+        owner: "Project Coordinator, examiners and students",
+    },
 ];
 
 const questions = [
@@ -115,7 +133,7 @@ export default function HowItWorksPage() {
                     <h1>A clear process for students and the department.</h1>
                     <p>
                         ProjFlow supports the process from departmental setup and student onboarding through
-                        supervisor allocation, project-topic proposal review, topic similarity assessment and chapter-by-chapter project report submission.
+                        supervisor allocation, project report review, final defence, assessment and result publication.
                     </p>
                     <div className="public-page-actions">
                         <Link className="public-button public-button-primary" to="/register">Student registration <span aria-hidden="true">→</span></Link>

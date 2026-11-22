@@ -47,6 +47,8 @@ export default function DashboardLayout() {
         ...(isCoordinator ? visibleCoordinatorLinks : [{ to: "/app/overview", label: "Overview", icon: "◫", end: true }]),
         ...(isLecturer && isCoordinator ? lecturerLinks.slice(1) : isLecturer ? lecturerLinks.slice(1) : []),
         ...(hasAnyRole(["student"]) ? studentLinks.slice(1) : []),
+        ...(hasAnyRole(["project_coordinator", "lecturer", "student"]) ? [{ to: "/app/completion", label: "Final project & defence", icon: "▣" }] : []),
+        { to: "/app/notifications", label: "Notifications", icon: "◉" },
     ];
 
     async function handleLogout() {

@@ -38,6 +38,9 @@ function getErrorMessage(payload, fallback = "The request could not be completed
     if (!payload) {
         return fallback;
     }
+    if (Array.isArray(payload)) {
+        return payload.map((item) => typeof item === "string" ? item : getErrorMessage(item, fallback)).join(" ") || fallback;
+    }
     if (typeof payload.detail === "string") {
         return payload.detail;
     }
