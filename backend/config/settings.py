@@ -81,11 +81,14 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 if DATABASE_URL:
+    DATABASE_SSL_REQUIRE = os.environ.get(
+        "DATABASE_SSL_REQUIRE", "true"
+    ).strip().lower() in {"true", "1", "yes"}
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=0,
-            ssl_require=True,
+            ssl_require=DATABASE_SSL_REQUIRE,
         )
     }
 else:
@@ -157,7 +160,18 @@ SECURE_SSL_REDIRECT = os.environ.get(
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "same-origin"
-SECURE_HSTS_SECONDS = 0
+SECURE_HSTS_SECONDS = int(
+    os.environ.get(
+        "DJANGO_SECURE_HSTS_SECONDS",
+        "31536000" if not DEBUG and SECURE_SSL_REDIRECT else "0",
+    )
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "false"
+).strip().lower() in {"true", "1", "yes"}
+SECURE_HSTS_PRELOAD = os.environ.get(
+    "DJANGO_SECURE_HSTS_PRELOAD", "false"
+).strip().lower() in {"true", "1", "yes"}
 
 # Optional SMTP delivery; in-app notifications work without email configuration.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

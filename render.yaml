@@ -9,7 +9,7 @@ services:
         rootDir: backend
         buildCommand: pip install -r requirements.txt && python manage.py warm_topic_similarity_model && python manage.py check && python manage.py collectstatic --noinput
         startCommand: python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
-        healthCheckPath: /api/health/
+        healthCheckPath: /api/ready/
         autoDeployTrigger: checksPass
         envVars:
             -
@@ -21,6 +21,15 @@ services:
             -
                 key: DJANGO_SECURE_SSL_REDIRECT
                 value: "true"
+            -
+                key: DJANGO_SECURE_HSTS_SECONDS
+                value: "31536000"
+            -
+                key: DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
+                value: "false"
+            -
+                key: DJANGO_SECURE_HSTS_PRELOAD
+                value: "false"
             -
                 key: DJANGO_ALLOWED_HOSTS
                 value: ".onrender.com,localhost,127.0.0.1"

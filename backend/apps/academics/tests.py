@@ -1,7 +1,9 @@
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.test import APITestCase
 from openpyxl import Workbook
@@ -477,6 +479,122 @@ class StudentRegistrationAPITests(AcademicTestDataMixin, APITestCase):
             review.data["verification_status"],
             StudentVerificationStatus.MANUALLY_APPROVED,
         )
+
+
+class StudentLecturerBoundaryTests(AcademicTestDataMixin, APITestCase):
+    def setUp(self):
+        self.session = AcademicSession.objects.create(name="Role boundary session")
+
+    def test_student_cannot_receive_a_lecturer_profile(self):
+        student = self.create_user_with_role("student-profile@example.com", RoleCode.STUDENT)
+        with self.assertRaises(DjangoValidationError):
+            LecturerProfile.objects.create(user=student)
+
+    def test_lecturer_cannot_be_enrolled_as_a_student(self):
+        lecturer = self.create_user_with_role("lecturer-enrollment@example.com", RoleCode.LECTURER)
+        with self.assertRaises(DjangoValidationError):
+            StudentEnrollment.objects.create(
+                user=lecturer,
+                session=self.session,
+                matric_number="ROLE/001",
+            )
+
+    def test_active_lecturer_profile_cannot_be_enrolled_without_a_lecturer_role(self):
+        profile_only_user = User.objects.create_user(
+            email="profile-only-enrollment@example.com",
+            password="Strong-test-password-123",
+        )
+        LecturerProfile.objects.create(user=profile_only_user, staff_number="PROFILE-001")
+        with self.assertRaises(DjangoValidationError):
+            StudentEnrollment.objects.create(
+                user=profile_only_user,
+                session=self.session,
+                matric_number="ROLE/004",
+            )
+
+    def test_database_rejects_bulk_student_enrollment_for_lecturer(self):
+        lecturer = self.create_user_with_role("lecturer-bulk-enrollment@example.com", RoleCode.LECTURER)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                StudentEnrollment.objects.bulk_create([
+                    StudentEnrollment(
+                        user=lecturer,
+                        session=self.session,
+                        matric_number="ROLE/002",
+                    ),
+                ])
+        self.assertFalse(StudentEnrollment.objects.filter(user=lecturer).exists())
+
+    def test_database_rejects_bulk_lecturer_profile_for_student(self):
+        student = self.create_user_with_role("student-bulk-profile@example.com", RoleCode.STUDENT)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                LecturerProfile.objects.bulk_create([
+                    LecturerProfile(user=student, staff_number="ROLE-STAFF-001"),
+                ])
+        self.assertFalse(LecturerProfile.objects.filter(user=student).exists())
+
+    def test_student_enrollment_prevents_later_lecturer_role_assignment(self):
+        enrolled_user = User.objects.create_user(
+            email="enrolled-without-role@example.com",
+            password="Strong-test-password-123",
+        )
+        StudentEnrollment.objects.create(
+            user=enrolled_user,
+            session=self.session,
+            matric_number="ROLE/003",
+        )
+        with self.assertRaises(DjangoValidationError):
+            LecturerProfile.objects.create(user=enrolled_user)
+        with self.assertRaises(DjangoValidationError):
+            UserRole.objects.create(
+                user=enrolled_user,
+                role=Role.objects.get(code=RoleCode.LECTURER),
+            )
+        lecturer_role = Role.objects.get(code=RoleCode.LECTURER)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                UserRole.objects.bulk_create([
+                    UserRole(user=enrolled_user, role=lecturer_role),
+                ])
+
+    def test_inactive_lecturer_profile_cannot_be_reactivated_after_student_role_assignment(self):
+        former_lecturer = User.objects.create_user(
+            email="former-lecturer@example.com",
+            password="Strong-test-password-123",
+        )
+        profile = LecturerProfile.objects.create(
+            user=former_lecturer,
+            staff_number="FORMER-001",
+            is_active=False,
+        )
+        UserRole.objects.create(
+            user=former_lecturer,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                LecturerProfile.objects.filter(pk=profile.pk).update(is_active=True)
+        profile.refresh_from_db()
+        self.assertFalse(profile.is_active)
+
+    def test_active_lecturer_profile_blocks_student_role_assignment(self):
+        lecturer_profile_user = User.objects.create_user(
+            email="active-profile-user@example.com",
+            password="Strong-test-password-123",
+        )
+        LecturerProfile.objects.create(
+            user=lecturer_profile_user,
+            staff_number="ACTIVE-001",
+        )
+        student_role = Role.objects.get(code=RoleCode.STUDENT)
+        with self.assertRaises(DjangoValidationError):
+            UserRole.objects.create(user=lecturer_profile_user, role=student_role)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                UserRole.objects.bulk_create([
+                    UserRole(user=lecturer_profile_user, role=student_role),
+                ])
 
 
 class LecturerAndSupervisorAPITests(AcademicTestDataMixin, APITestCase):

@@ -1,8 +1,10 @@
 import uuid
 
 from django.conf import settings
+from django.apps import apps
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.functions import Lower
 from django.utils import timezone
@@ -145,6 +147,45 @@ class UserRole(models.Model):
                 name="accounts_unique_user_role",
             )
         ]
+
+    def save(self, *args, **kwargs):
+        if self.user_id and self.role_id:
+            database = kwargs.get("using") or self._state.db or "default"
+            role_code = Role.objects.using(database).filter(
+                pk=self.role_id
+            ).values_list("code", flat=True).first()
+            incompatible_role = {
+                RoleCode.STUDENT: RoleCode.LECTURER,
+                RoleCode.LECTURER: RoleCode.STUDENT,
+            }.get(role_code)
+            has_incompatible_assignment = bool(
+                incompatible_role
+                and UserRole.objects.using(database).filter(
+                    user_id=self.user_id,
+                    role__code=incompatible_role,
+                ).exclude(pk=self.pk).exists()
+            )
+            has_active_lecturer_profile = False
+            has_student_enrollment = False
+            if role_code == RoleCode.STUDENT:
+                LecturerProfile = apps.get_model("academics", "LecturerProfile")
+                has_active_lecturer_profile = LecturerProfile.objects.using(
+                    database
+                ).filter(user_id=self.user_id, is_active=True).exists()
+            elif role_code == RoleCode.LECTURER:
+                StudentEnrollment = apps.get_model("academics", "StudentEnrollment")
+                has_student_enrollment = StudentEnrollment.objects.using(
+                    database
+                ).filter(user_id=self.user_id).exists()
+            if (
+                has_incompatible_assignment
+                or has_active_lecturer_profile
+                or has_student_enrollment
+            ):
+                raise ValidationError(
+                    "Student accounts cannot hold Lecturer roles or active Lecturer profiles, and Lecturer accounts cannot be assigned the Student role."
+                )
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.user.email} - {self.role.name}"

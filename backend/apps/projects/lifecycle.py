@@ -9,7 +9,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -38,15 +38,35 @@ def coordinator(user):
     return user.has_role(RoleCode.PROJECT_COORDINATOR)
 
 
+def lecturer_account(user):
+    return (
+        user.has_role(RoleCode.LECTURER)
+        and not user.has_role(RoleCode.STUDENT)
+        and not StudentEnrollment.objects.filter(user=user).exists()
+    )
+
+
 def supervisor(user, enrollment):
-    return user.has_role(RoleCode.LECTURER) and _current_assignment(enrollment, actor=user) is not None
+    return lecturer_account(user) and _current_assignment(enrollment, actor=user) is not None
 
 
 def examiner(user, project):
-    assignment = SupervisorAssignment.objects.filter(student_enrollment=project.enrollment, is_current=True).first()
-    if not project.panel_id or not assignment or not user.has_role(RoleCode.LECTURER):
+    if (
+        not project.panel_id
+        or not lecturer_account(user)
+    ):
         return None
-    return project.panel.members.filter(user=user, is_active=True, user__is_active=True).exclude(pk=assignment.lecturer_id).first()
+    has_supervised_project = SupervisorAssignment.objects.filter(
+        student_enrollment=project.enrollment,
+        lecturer__user=user,
+    ).exists()
+    if has_supervised_project:
+        return None
+    return project.panel.members.filter(
+        user=user,
+        is_active=True,
+        user__is_active=True,
+    ).first()
 
 
 def require(condition, message="You cannot perform this action."):
@@ -171,9 +191,37 @@ def result_for(project):
 def validate_panel(project):
     assignment = SupervisorAssignment.objects.filter(student_enrollment=project.enrollment, is_current=True).first()
     check(assignment is not None and project.panel_id, "A current supervisor and examination panel are required.")
-    check(not project.panel.members.filter(pk=assignment.lecturer_id).exists(), "The student's supervisor cannot examine this project.")
+    previous_supervisor_ids = SupervisorAssignment.objects.filter(
+        student_enrollment=project.enrollment
+    ).values("lecturer_id")
+    check(
+        not project.panel.members.filter(pk__in=previous_supervisor_ids).exists(),
+        "A current or former supervisor cannot examine this project.",
+    )
     check(not project.panel.members.filter(Q(is_active=False) | Q(user__is_active=False)).exists(), "The panel contains an inactive examiner. Contact the Coordinator.")
+    check(
+        not project.panel.members.filter(
+            user__role_assignments__role__code=RoleCode.STUDENT
+        ).exists(),
+        "Student accounts cannot serve as examiners.",
+    )
+    check(
+        not project.panel.members.filter(
+            user__student_enrollments__isnull=False
+        ).exists(),
+        "Accounts with student enrollments cannot serve as examiners.",
+    )
+    check(project.panel.members.exists(), "The selected examination panel must contain an active examiner.")
     check(project.panel.members.count() == project.panel.members.filter(user__role_assignments__role__code=RoleCode.LECTURER).distinct().count(), "All panel members must retain the Lecturer role.")
+
+
+def independent_coordinator(user, project):
+    """A result approver must not have examined or scored the same project."""
+    if not coordinator(user):
+        return False
+    if project.panel_id and project.panel.members.filter(user=user).exists():
+        return False
+    return not project.scores.filter(examiner__user=user).exists()
 
 
 def upload_document(uploaded_file, enrollment, namespace):
@@ -195,26 +243,29 @@ def project_data(project, user):
     active = project.enrollment.session.status == "active"
     state = project.status
     actions = []
-    if active or project.published_at:
+    reopened_for_panel_integrity = project.events.filter(
+        action="panel_reallocation_required"
+    ).exists()
+    if active or project.published_at or reopened_for_panel_integrity:
         if active and own and state in ("revision_requested", "clearance_denied"):
             actions.append("submit")
         if sup and state == "submitted":
             actions.extend(["recommend", "decline"])
         if coord and state == "recommended":
             actions.extend(["clear", "deny_clearance"])
-        if coord and state in ("cleared", "scheduled") and not project.scores.exists():
+        if coord and state in ("cleared", "scheduled", "panel_reallocation_required") and not project.scores.filter(round=project.score_round).exists():
             actions.append("schedule")
         if member and state in ("scheduled", "scoring", "correction") and (project.defence_at and timezone.now() >= project.defence_at) and not project.scores.filter(examiner=member, round=project.score_round).exists():
             actions.append("score")
-        if coord and state in ("scoring", "correction") and result_for(project):
+        if independent_coordinator(user, project) and state in ("scoring", "correction") and result_for(project):
             actions.extend(["approve_result", "return_result"])
-        if coord and state == "approved":
+        if independent_coordinator(user, project) and state == "approved":
             actions.extend(["publish", "return_result"])
         if own and state == "published" and project.published_at and timezone.now() <= project.published_at + timedelta(days=14) and not project.appeals.filter(status__in=["pending", "reviewed"]).exists():
             actions.append("appeal")
         if member and state == "published" and project.appeals.filter(status="pending").exists():
             actions.append("review_appeal")
-        if coord and state == "published" and project.appeals.filter(status="reviewed").exists():
+        if independent_coordinator(user, project) and state == "published" and project.appeals.filter(status="reviewed").exists():
             actions.extend(["accept_appeal", "reject_appeal"])
     history = project.events.exclude(action="score").order_by("created_at")
     if not (coord or member):
@@ -227,7 +278,7 @@ def project_data(project, user):
         "panel_name": project.panel.name if project.panel_id else "",
         "defence_at": project.defence_at, "venue": project.venue,
         "components": project.components if (member or coord or sup) else [],
-        "published_result": project.published_result, "published_at": project.published_at,
+        "published_result": project.published_result, "published_at": None if state == "panel_reallocation_required" else project.published_at,
         "documents": [{"id": str(d.pk), "filename": d.original_filename, "version": d.version, "note": d.note, "created_at": d.created_at} for d in project.documents.order_by("version")] if (own or sup or member or coord) else [],
         "events": [{"action": e.action, "note": e.note, "created_at": e.created_at, "schedule": {"panel_name": e.data.get("panel_name", ""), "defence_at": e.data.get("defence_at"), "venue": e.data.get("venue", "")} if e.action == "schedule" else None} for e in history],
         "appeals": [{"id": str(a.pk), "complaint": a.complaint, "status": a.status, "panel_feedback": a.panel_feedback if (coord or member) else "", "decision_note": a.decision_note, "created_at": a.created_at} for a in project.appeals.order_by("created_at") if own or coord or member],
@@ -238,7 +289,11 @@ def project_data(project, user):
         shared["panel_size"] = project.panel.members.count() if project.panel_id else 0
     if member:
         previous = latest_scores(project).get(member.pk)
-        shared["my_marks"] = previous.marks if previous else []
+        shared["my_marks"] = (
+            previous.marks
+            if previous and (previous.round == project.score_round or state == "correction")
+            else []
+        )
     return shared
 
 
@@ -249,10 +304,12 @@ def visible_projects(user, session):
     filters = Q(pk__in=[])
     if user.has_role(RoleCode.STUDENT):
         filters |= Q(enrollment__user=user)
-    if user.has_role(RoleCode.LECTURER):
+    if lecturer_account(user):
         filters |= Q(enrollment__supervisor_assignments__is_current=True, enrollment__supervisor_assignments__lecturer__user=user, enrollment__supervisor_assignments__lecturer__is_active=True)
-        current_supervisees = SupervisorAssignment.objects.filter(is_current=True, lecturer__user=user).values("student_enrollment_id")
-        filters |= Q(panel__members__user=user, panel__members__is_active=True) & ~Q(enrollment_id__in=current_supervisees)
+        supervised_projects = SupervisorAssignment.objects.filter(
+            lecturer__user=user
+        ).values("student_enrollment_id")
+        filters |= Q(panel__members__user=user, panel__members__is_active=True) & ~Q(enrollment_id__in=supervised_projects)
     return queryset.filter(filters).distinct()
 
 
@@ -260,8 +317,8 @@ def session_data(user, session):
     coord = coordinator(user)
     enrollments = StudentEnrollment.objects.filter(session=session, verification_status__in=VERIFIED_STATUSES).select_related("user", "session")
     own = enrollments.filter(user=user).first() if user.has_role(RoleCode.STUDENT) else None
-    assigned = enrollments.filter(supervisor_assignments__is_current=True, supervisor_assignments__lecturer__user=user, supervisor_assignments__lecturer__is_active=True) if user.has_role(RoleCode.LECTURER) else enrollments.none()
-    profile = LecturerProfile.objects.filter(user=user, is_active=True).first() if user.has_role(RoleCode.LECTURER) else None
+    assigned = enrollments.filter(supervisor_assignments__is_current=True, supervisor_assignments__lecturer__user=user, supervisor_assignments__lecturer__is_active=True) if lecturer_account(user) else enrollments.none()
+    profile = LecturerProfile.objects.filter(user=user, is_active=True).first() if lecturer_account(user) else None
     deadlines = [{"kind": d.kind, "label": {"topic": "Project topic", "final": "Final project", "defence": "Defence"}[d.kind], "due_date": d.due_date} for d in ProjectDeadline.objects.filter(session=session, kind__in=DEADLINE_KINDS)]
     deadlines += [{"kind": f"section:{s.pk}", "label": s.title, "due_date": s.due_date} for s in ProjectReportSection.objects.filter(session=session, is_active=True, due_date__isnull=False)]
     if own:
@@ -298,11 +355,22 @@ def session_data(user, session):
         "deadlines": deadlines, "sections": [{"kind": f"section:{section.pk}", "label": section.title} for section in ProjectReportSection.objects.filter(session=session, is_active=True)] if coord else [], "scheme": scheme.components if scheme else [],
         "assigned_count": assigned.count(),
         "extensions": [{"id": str(e.pk), "kind": e.kind, "label": next((d["label"] for d in deadlines if d["kind"] == e.kind), e.kind), "student": e.enrollment.user.get_full_name(), "matric": e.enrollment.matric_number, "original_due_date": e.original_due_date, "requested_date": e.requested_date, "justification": e.justification, "status": e.status, "decision_note": e.decision_note, "created_at": e.created_at} for e in extensions.order_by("-created_at")],
-        "panels": [{"id": str(p.pk), "name": p.name, "members": [{"id": str(m.pk), "name": m.user.get_full_name()} for m in p.members.select_related("user").all()]} for p in DefencePanel.objects.filter(session=session)] if coord else [],
-        "lecturers": [{"id": str(l.pk), "name": l.user.get_full_name()} for l in LecturerProfile.objects.filter(is_active=True, user__is_active=True, user__role_assignments__role__code=RoleCode.LECTURER).select_related("user").distinct()] if coord else [],
+        "panels": [
+            {
+                "id": str(panel.pk),
+                "name": panel.name,
+                "members": [
+                    {"id": str(member.pk), "name": member.user.get_full_name()}
+                    for member in panel.members.select_related("user").all()
+                ],
+            }
+            for panel in DefencePanel.objects.filter(session=session).prefetch_related("members__user")
+            if panel.members.filter(is_active=True, user__is_active=True, user__role_assignments__role__code=RoleCode.LECTURER).exclude(user__role_assignments__role__code=RoleCode.STUDENT).exclude(user__student_enrollments__isnull=False).distinct().count() == panel.members.count() and panel.members.exists()
+        ] if coord else [],
+        "lecturers": [{"id": str(l.pk), "name": l.user.get_full_name()} for l in LecturerProfile.objects.filter(is_active=True, user__is_active=True, user__role_assignments__role__code=RoleCode.LECTURER).exclude(user__role_assignments__role__code=RoleCode.STUDENT).exclude(user__student_enrollments__isnull=False).select_related("user").distinct()] if coord else [],
         "projects": [project_data(p, user) for p in projects],
         "progress": progress,
-        "summary": {"verified_students": enrollments.count() if coord else None, "final_submissions": len(projects), "cleared": sum(p.status in ["cleared", "scheduled", "scoring", "correction", "approved", "published"] for p in projects), "published": sum(bool(p.published_at) for p in projects), "pending_extensions": extensions.filter(status="pending").count(), "overdue_students": sum(bool(p["overdue"]) for p in progress), "topics_approved": sum(p["topic_status"] == "approved" for p in progress)},
+        "summary": {"verified_students": enrollments.count() if coord else None, "final_submissions": len(projects), "cleared": sum(p.status in ["cleared", "scheduled", "panel_reallocation_required", "scoring", "correction", "approved", "published"] for p in projects), "published": sum(bool(p.published_at) for p in projects), "pending_extensions": extensions.filter(status="pending").count(), "overdue_students": sum(bool(p["overdue"]) for p in progress), "topics_approved": sum(p["topic_status"] == "approved" for p in progress)},
     }
 
 
@@ -342,7 +410,7 @@ def available_sessions(user):
     filters = Q(pk__in=[])
     if user.has_role(RoleCode.STUDENT):
         filters |= Q(student_enrollments__user=user)
-    if user.has_role(RoleCode.LECTURER):
+    if lecturer_account(user):
         filters |= Q(student_enrollments__supervisor_assignments__lecturer__user=user)
         filters |= Q(defence_panels__members__user=user)
         filters |= Q(status="active")
@@ -360,7 +428,68 @@ def perform_action(user, data, uploaded_file=None):
             session = AcademicSession.objects.select_for_update().get(pk=session.pk)
             require(available_sessions(user).filter(pk=session.pk).exists())
             if session.status != "active":
-                check(operation in POST_PUBLICATION_ACTIONS and session.status == "closed" and ProjectCompletion.objects.filter(pk=uid(data.get("project")), enrollment__session=session, published_at__isnull=False).exists(), "This academic session is not active.")
+                project_id = data.get("project")
+                closed_project = (
+                    ProjectCompletion.objects.filter(
+                        pk=uid(project_id),
+                        enrollment__session=session,
+                    ).first()
+                    if project_id
+                    else None
+                )
+                reopened_for_panel_integrity = bool(
+                    closed_project
+                    and closed_project.events.filter(
+                        action="panel_reallocation_required"
+                    ).exists()
+                )
+                reallocation_projects = ProjectCompletion.objects.filter(
+                    enrollment__session=session,
+                    status__in=["panel_reallocation_required", "scheduled"],
+                    events__action="panel_reallocation_required",
+                ).distinct()
+                permitted_reallocation_setup = bool(
+                    reallocation_projects.exists()
+                    and (
+                        (
+                            operation in ("create_panel", "update_panel")
+                            and coord
+                            and reallocation_projects.exclude(
+                                scores__round=F("score_round")
+                            ).exists()
+                        )
+                        or (
+                            operation == "save_scheme"
+                            and lecturer_account(user)
+                            and reallocation_projects.filter(
+                                status="panel_reallocation_required",
+                                enrollment__supervisor_assignments__is_current=True,
+                                enrollment__supervisor_assignments__lecturer__user=user,
+                            ).exclude(scores__round=F("score_round")).exists()
+                        )
+                    )
+                )
+                permitted_post_publication_action = bool(
+                    closed_project
+                    and operation in POST_PUBLICATION_ACTIONS
+                    and (closed_project.published_at is not None or reopened_for_panel_integrity)
+                )
+                permitted_panel_reallocation = bool(
+                    closed_project
+                    and operation == "schedule"
+                    and closed_project.status in ("panel_reallocation_required", "scheduled")
+                    and reopened_for_panel_integrity
+                    and not closed_project.scores.filter(round=closed_project.score_round).exists()
+                )
+                check(
+                    session.status == "closed"
+                    and (
+                        permitted_post_publication_action
+                        or permitted_panel_reallocation
+                        or permitted_reallocation_setup
+                    ),
+                    "This academic session is not active.",
+                )
             _perform(user, session, operation, data, uploaded_file, uploaded_paths)
     except Exception:
         for path in uploaded_paths:
@@ -409,7 +538,10 @@ def _perform(user, session, op, data, uploaded_file, uploaded_paths):
         notify([extension.enrollment.user_id], "deadlines", "Your deadline extension request has been decided.")
         return
     if op == "save_scheme":
-        require(user.has_role(RoleCode.LECTURER))
+        require(
+            lecturer_account(user),
+            "Only a Lecturer account can configure an assessment structure.",
+        )
         profile = LecturerProfile.objects.filter(user=user, is_active=True).first()
         require(profile is not None)
         components = normalize_components(data.get("components"))
@@ -422,7 +554,16 @@ def _perform(user, session, op, data, uploaded_file, uploaded_paths):
         ids = data.get("members")
         check(isinstance(ids, list) and 1 <= len(ids) <= 30, "Choose one or more examiners.")
         ids = {uid(value) for value in ids}
-        members = LecturerProfile.objects.filter(pk__in=ids, is_active=True, user__is_active=True, user__role_assignments__role__code=RoleCode.LECTURER).distinct()
+        members = LecturerProfile.objects.filter(
+            pk__in=ids,
+            is_active=True,
+            user__is_active=True,
+            user__role_assignments__role__code=RoleCode.LECTURER,
+        ).exclude(
+            user__role_assignments__role__code=RoleCode.STUDENT
+        ).exclude(
+            user__student_enrollments__isnull=False
+        ).distinct()
         check(members.count() == len(ids), "Select active lecturers only.")
         panel = get_row(DefencePanel, data.get("panel"), session=session) if op == "update_panel" else None
         check(not DefencePanel.objects.filter(session=session, name__iexact=name).exclude(pk=panel.pk if panel else None).exists(), "A panel with this name already exists.")
@@ -475,7 +616,11 @@ def _perform(user, session, op, data, uploaded_file, uploaded_paths):
         project.status = "cleared" if op == "clear" else "clearance_denied"
     elif op == "schedule":
         require(coord)
-        check(state in ("cleared", "scheduled") and not project.scores.exists(), "Only cleared projects without scores may be allocated.")
+        check(
+            state in ("cleared", "scheduled", "panel_reallocation_required")
+            and not project.scores.filter(round=project.score_round).exists(),
+            "Only cleared projects without scores in the current assessment round may be allocated.",
+        )
         panel = get_row(DefencePanel, data.get("panel"), session=session)
         assignment = _current_assignment(project.enrollment)
         check(assignment is not None, "The student needs an active supervisor.")
@@ -503,7 +648,10 @@ def _perform(user, session, op, data, uploaded_file, uploaded_paths):
         if state != "correction":
             project.status = "scoring"
     elif op in ("approve_result", "return_result", "publish"):
-        require(coord)
+        require(
+            independent_coordinator(user, project),
+            "An examiner cannot approve, return or publish a result for a project they examined.",
+        )
         validate_panel(project)
         if op == "approve_result":
             check(state in ("scoring", "correction") and result_for(project) is not None, "All examiners must submit scores for this round.")
@@ -534,7 +682,10 @@ def _perform(user, session, op, data, uploaded_file, uploaded_paths):
         appeal.reviewed_at = timezone.now()
         appeal.save()
     elif op in ("accept_appeal", "reject_appeal"):
-        require(coord)
+        require(
+            independent_coordinator(user, project),
+            "An examiner cannot make the Coordinator's appeal decision for a project they examined.",
+        )
         check(state == "published", "The appeal requires a published result.")
         appeal = get_row(ResultAppeal, data.get("appeal"), project=project)
         check(appeal.status == "reviewed" and bool(note), "Panel feedback and a Coordinator decision are required.")

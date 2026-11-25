@@ -2,6 +2,7 @@ import re
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -304,6 +305,17 @@ class StudentEnrollment(models.Model):
 
     def save(self, *args, **kwargs):
         self.matric_number = normalise_matric_number(self.matric_number)
+        database = kwargs.get("using") or self._state.db or "default"
+        if self.user_id and (
+            self.user.has_role("lecturer")
+            or LecturerProfile.objects.using(database).filter(
+                user_id=self.user_id,
+                is_active=True,
+            ).exists()
+        ):
+            raise ValidationError(
+                "A Lecturer account cannot be enrolled as a student."
+            )
         super().save(*args, **kwargs)
 
     @property
@@ -344,6 +356,15 @@ class LecturerProfile(models.Model):
         ordering = ["user__last_name", "user__first_name"]
 
     def save(self, *args, **kwargs):
+        if self.user_id and self.is_active and (
+            self.user.has_role("student")
+            or StudentEnrollment.objects.using(
+                kwargs.get("using") or self._state.db or "default"
+            ).filter(user_id=self.user_id).exists()
+        ):
+            raise ValidationError(
+                "A student account cannot have a Lecturer profile."
+            )
         if self.staff_number is not None:
             self.staff_number = self.staff_number.strip().upper() or None
         self.designation = self.designation.strip()

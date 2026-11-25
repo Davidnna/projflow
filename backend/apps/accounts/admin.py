@@ -34,7 +34,7 @@ class UserAdmin(DjangoUserAdmin):
 class RoleAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "is_system", "created_at")
     search_fields = ("name", "code")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("code", "created_at")
 
 
 @admin.register(UserRole)

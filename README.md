@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `1.0.0-rc.1` (consolidated acceptance-testing candidate)
+- **Current release:** `1.0.1-rc.1` (role-integrity and deployment-hardening candidate)
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -196,6 +196,21 @@ This release candidate extends the working 0.3.15 release with the remaining cor
 
 Existing decisions take precedence over earlier draft requirements: sequential report-section approval, PDF/DOCX only, 20 MB per uploaded document, and manual academic session activation/closure. Annotated feedback consists of uploaded corrected documents rather than a browser document editor. Other historical file formats, inline annotation editing and supporting-file bundles are not included in this candidate. Email delivery is optional and requires a working SMTP service; it is not verified by deploying the application alone. Final go-live requires passing CI, live acceptance testing, production backup and security review.
 
+### Release 1.0.1-rc.1 (role integrity, independent result approval and deployment hardening)
+
+This hotfix strengthens the academic role boundary and examination independence identified during the 1.0.0 RC1 audit. It retains the existing account, enrollment, supervision, report, assessment and result history. Migration `accounts/0003_enforce_student_lecturer_exclusivity.py` first normalises any conflicting legacy accounts, safely reopens affected defence workflows where an invalid examiner was already allocated, then installs database triggers for PostgreSQL and SQLite. It does not delete student enrollments, report documents, score records or historical supervisor assignments.
+
+- A Student account cannot receive the Lecturer role. A Lecturer account cannot receive the Student role. The boundary is enforced in the `UserRole` model and by database triggers, including bulk inserts and queryset updates.
+- An account with any StudentEnrollment cannot receive the Lecturer role or create/retain an active Lecturer profile. An account with an active Lecturer profile cannot receive the Student role or be enrolled as a student. The model layer and database triggers enforce these rules.
+- Existing conflicting records are migrated safely: the Lecturer role is removed from any account with a Student role or student enrollment; enrolled accounts are guaranteed the Student role; its Lecturer profile is deactivated; any current supervisor assignments through that profile are closed with a migration note and both the affected student and Coordinator are notified. If an affected profile was on an examination panel, that panel member is removed, the affected project is placed in `panel_reallocation_required`, and the Coordinator and student are notified. The previous panel, score rows, published result and panel details are retained in the project workflow event; the project is moved to a new score round so old marks are not counted in the replacement assessment. Historical assignment rows and student academic records remain intact. The Coordinator must reassign affected supervisors and examination panels before proceeding. This controlled recovery path also works for closed sessions with affected projects: supervisor reassignment, assessment setup, panel creation and rescheduling are enabled only for those projects; other historical session actions remain read-only.
+- A current or former supervisor cannot be allocated to that student's examination panel. Historical supervisors cannot submit marks, review appeals as an examiner or see the project through the examiner workspace.
+- A Coordinator who is a member of the project's examination panel or has submitted any examiner score for that project cannot approve, return or publish its result, or decide its appeal. The conflicting Coordinator also does not receive those actions in the workspace.
+- Production HTTPS responses use HSTS with a one-year max-age. HSTS subdomain inheritance and preload remain disabled to avoid imposing policy on unrelated shared hosting subdomains.
+- Render now uses `/api/ready/` as its health check. This endpoint verifies database connectivity, so a running web process with an unavailable database is not marked ready.
+- Regression coverage includes model-level role rejection, database-trigger rejection of bulk role writes, StudentEnrollment/LecturerProfile boundary checks, former-supervisor panel and scoring conflicts, Coordinator/examiner result separation, HSTS response headers and database readiness failure handling.
+
+The release is an acceptance candidate until GitHub Actions passes the full Django suite and frontend build, the Render migration completes, and the live role workflows are verified. The current suite contains 132 authored test methods across 17 test classes.
+
 ## 2. Technology stack
 
 | Layer | Technology | Responsibility |
@@ -254,7 +269,7 @@ The four global roles are:
 | Lecturer | Lecturer profile and assigned supervision/examination responsibilities |
 | Student | Registration, topic proposals, project development, submissions and progress reporting |
 
-A user may hold more than one global role. API access is checked by Django; hiding a frontend control is not an access-control mechanism.
+A user may hold more than one compatible global role. Student and Lecturer are mutually exclusive: an account with the Student role or any student enrollment cannot hold the Lecturer role or an active Lecturer profile. A Lecturer account cannot be enrolled as a student. These boundaries are enforced by the application and database, not merely by the interface. API access is checked by Django; hiding a frontend control is not an access-control mechanism.
 
 ## 5. Approved academic workflow
 
@@ -514,7 +529,7 @@ Install:
 - Node.js 24 and npm.
 - Git.
 
-A local PostgreSQL server is optional. When `DATABASE_URL` is empty, Django uses SQLite for local development and tests. Production uses Supabase PostgreSQL.
+A local PostgreSQL server is optional. When `DATABASE_URL` is empty, Django uses SQLite for local development and tests. Production uses Supabase PostgreSQL. `DATABASE_SSL_REQUIRE` defaults to `true` for hosted PostgreSQL; set it to `false` only when connecting to a trusted local PostgreSQL server without TLS.
 
 ### 9.2 Clone the repository
 
@@ -669,8 +684,10 @@ The root `render.yaml` defines the Django service:
 - Root directory: `backend`.
 - Build: install requirements, run Django checks and collect static files.
 - Start: apply migrations and start Gunicorn.
-- Health check: `/api/health/`.
+- Health check: `/api/ready/` (checks database connectivity).
 - Deployment: after linked GitHub checks pass.
+
+If the existing Render service does not automatically sync `render.yaml`, update its Health Check Path to `/api/ready/` in the Render dashboard. Confirm the HSTS environment values above are present; the production settings also default to one-year HSTS when HTTPS redirection is enabled.
 
 Configure these environment values in Render:
 
@@ -679,8 +696,12 @@ Configure these environment values in Render:
 | `DJANGO_SECRET_KEY` | Generated by Render |
 | `DJANGO_DEBUG` | `false` |
 | `DJANGO_SECURE_SSL_REDIRECT` | `true` |
+| `DJANGO_SECURE_HSTS_SECONDS` | `31536000` (one year) |
+| `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` | `false` |
+| `DJANGO_SECURE_HSTS_PRELOAD` | `false` |
 | `DJANGO_ALLOWED_HOSTS` | `.onrender.com,localhost,127.0.0.1` |
 | `DATABASE_URL` | Supabase Session pooler URI |
+| `DATABASE_SSL_REQUIRE` | `true` (default; no additional setting required on Render) |
 | `PROJFLOW_INITIAL_ADMIN_SETUP_TOKEN` | Temporary random secret for first Administrator setup; remove after setup |
 | `CORS_ALLOWED_ORIGINS` | Exact Cloudflare Pages origin |
 | `CSRF_TRUSTED_ORIGINS` | Exact Cloudflare Pages origin |
@@ -748,18 +769,18 @@ Each user can enable email for chosen categories in Notifications. Email contain
 
 ### 10.9 Release acceptance checklist (live deployment)
 
-1. Back up the Supabase database and Storage; preserve the current 0.3.15 Git commit as a rollback point. Confirm GitHub Actions passes backend system checks, migration consistency, all tests and frontend build. Render should apply migration 0005 on startup. No new bucket is needed.
-2. Sign in with Coordinator, supervisor, two other active lecturer accounts (examiners) and a verified test student. Confirm existing registrations, report sections, reviews and downloads still work. Use a dedicated test student/session or synthetic test records, not real marks.
+1. Back up the Supabase database and Storage; preserve the current 1.0.0 RC1 Git commit as a rollback point. Confirm GitHub Actions passes backend system checks, migration consistency, the full SQLite suite, the PostgreSQL 16 migration/role-integrity job and frontend build. Render should apply `accounts/0003_enforce_student_lecturer_exclusivity.py` and the existing `projects/0005_completion_workflows.py` on startup. No new bucket is needed. Confirm Render reports `/api/ready/` healthy and HTTPS responses include the configured HSTS header.
+2. Sign in with Coordinator, supervisor, two other active lecturer accounts (examiners) and a verified test student. Confirm existing registrations, report sections, reviews and downloads still work. Verify a Student account is never listed or accepted as a Lecturer, and a Lecturer account cannot be enrolled as a student or given an active Lecturer profile if it already has a student enrollment. Use synthetic test records, not real marks.
 3. Download a student's report with spaces/Unicode in its filename; confirm original filename and no new tab. Request revision with written feedback and an annotated PDF/DOCX. Student downloads the annotation, resubmits and receives approval; verify required sequence and version history.
 4. Set topic/chapter/final/defence deadlines. Student requests an extension with a justification; confirm effective deadline changes only after Coordinator approval. Reject another request and confirm no extension. Check progress register overdue status.
 5. Approve the student's project topic and all required report sections. Submit complete PDF/DOCX, request revision, resubmit, recommend and clear. Verify student cannot bypass any gate and other students cannot download the document.
-6. Supervisor saves assessment components totaling 100. Reject invalid totals. Coordinator creates a panel with two other lecturers; scheduling a panel containing the student's supervisor must fail. Allocate a valid panel, date/time and venue. Use a near-future test appointment and submit scores after it begins. Check both assigned examiners and student see the schedule.
-7. Each examiner submits marks independently. Reject excessive or repeated marks; confirm an unauthorised lecturer cannot score. Verify Coordinator cannot approve until all assigned examiners submit. Return the result for correction and verify each examiner can submit only their own new marks. Compare computed averages to manual calculation.
+6. Supervisor saves assessment components totaling 100. Reject invalid totals. Coordinator creates a panel with two other lecturers; scheduling a panel containing the current or a former supervisor must fail. Allocate a valid panel, date/time and venue. Use a near-future test appointment and submit scores after it begins. Check both assigned examiners and student see the schedule.
+7. Each examiner submits marks independently. Reject excessive or repeated marks; confirm an unauthorised lecturer and any former supervisor cannot score. Verify a Coordinator who examined the project cannot approve, return or publish that result, and cannot decide its appeal. A separate eligible Coordinator can approve only after all assigned examiners submit. Return the result for correction and verify each examiner can submit only their own new marks. Compare computed averages to manual calculation.
 8. Approve then publish results. Students must not see draft marks or individual examiner scores. Submit an appeal, record panel feedback, accept or reject through the Coordinator. If accepted, repeat scoring, approval and publication; verify old published result remains visible during correction.
 9. Verify the Notifications inbox, unread status, category preferences and delivery if SMTP is configured. Test role-specific access, session isolation and historical record access. Confirm no secrets or private documents are exposed by API responses.
 10. Close a completed test session manually, confirm ordinary writes are disabled and an otherwise eligible published-result appeal can still be processed. Record failures, repair and rerun acceptance before institutional use.
 
-CI/runtime verification status at packaging: source syntax, relative frontend imports, migration field source comparison, five standalone assessment-calculation checks and ZIP integrity checked. The full suite contains 113 authored test methods. Django/DRF and Vite packages were unavailable in the packaging environment; full Django tests, migration autodetection and the production Vite build must be run by CI. Do not treat the candidate as verified for production until these and the live acceptance tests pass.
+CI/runtime verification status at packaging: Python and frontend source syntax, relative frontend imports, migration trigger SQL on SQLite, standalone assessment-calculation checks and ZIP integrity checked. The full suite contains 132 authored test methods across 17 test classes. GitHub Actions now runs the full SQLite backend suite and adds a PostgreSQL 16 migration/role-integrity job to execute the production database trigger migration and focused role/completion tests. Full Django tests, migration autodetection, PostgreSQL CI and the production Vite build must pass before live acceptance. Do not treat the candidate as verified for production until these and the live acceptance tests pass.
 
 ## 11. Branding
 

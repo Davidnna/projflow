@@ -3,6 +3,7 @@ import re
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from apps.accounts.models import Role, RoleCode, UserRole
@@ -243,13 +244,26 @@ def assign_supervisor(*, enrollment_id, lecturer_id, actor):
     enrollment = StudentEnrollment.objects.select_for_update().get(pk=enrollment_id)
     lecturer = LecturerProfile.objects.select_for_update().get(pk=lecturer_id)
 
-    if session.status != AcademicSessionStatus.ACTIVE:
+    from apps.projects.models import ProjectCompletion
+
+    reallocation_required = ProjectCompletion.objects.filter(
+        enrollment=enrollment,
+        status__in=["panel_reallocation_required", "scheduled"],
+        events__action="panel_reallocation_required",
+    ).exclude(scores__round=F("score_round")).exists()
+    if session.status != AcademicSessionStatus.ACTIVE and not (
+        session.status == AcademicSessionStatus.CLOSED and reallocation_required
+    ):
         raise ValidationError("Supervisors can only be assigned during the active academic session.")
     if not enrollment.is_verified:
         raise ValidationError("A supervisor can only be assigned to a verified student.")
     if not lecturer.is_active or not lecturer.user.is_active:
         raise ValidationError("The selected lecturer is not active for supervision.")
-    if not lecturer.user.has_role(RoleCode.LECTURER):
+    if (
+        not lecturer.user.has_role(RoleCode.LECTURER)
+        or lecturer.user.has_role(RoleCode.STUDENT)
+        or StudentEnrollment.objects.filter(user=lecturer.user).exists()
+    ):
         raise ValidationError("The selected account does not have the Lecturer role.")
     if SupervisorAssignment.objects.filter(
         student_enrollment=enrollment,
@@ -289,13 +303,26 @@ def reassign_supervisor(*, assignment_id, lecturer_id, actor, reason):
     if current_assignment is None:
         raise ValidationError("Only a current supervisor assignment can be reassigned.")
     new_lecturer = LecturerProfile.objects.select_for_update().get(pk=lecturer_id)
-    if session.status != AcademicSessionStatus.ACTIVE:
+    from apps.projects.models import ProjectCompletion
+
+    reallocation_required = ProjectCompletion.objects.filter(
+        enrollment=current_assignment.student_enrollment,
+        status__in=["panel_reallocation_required", "scheduled"],
+        events__action="panel_reallocation_required",
+    ).exclude(scores__round=F("score_round")).exists()
+    if session.status != AcademicSessionStatus.ACTIVE and not (
+        session.status == AcademicSessionStatus.CLOSED and reallocation_required
+    ):
         raise ValidationError("Supervisor assignments can only be changed during the active academic session.")
     if current_assignment.lecturer_id == new_lecturer.id:
         raise ValidationError("The new supervisor must be different from the current supervisor.")
     if not new_lecturer.is_active or not new_lecturer.user.is_active:
         raise ValidationError("The selected lecturer is not active for supervision.")
-    if not new_lecturer.user.has_role(RoleCode.LECTURER):
+    if (
+        not new_lecturer.user.has_role(RoleCode.LECTURER)
+        or new_lecturer.user.has_role(RoleCode.STUDENT)
+        or StudentEnrollment.objects.filter(user=new_lecturer.user).exists()
+    ):
         raise ValidationError("The selected account does not have the Lecturer role.")
 
     from apps.projects.models import ProjectCompletion

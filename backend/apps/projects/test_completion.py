@@ -7,8 +7,9 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, RoleCode, User, UserRole
 from apps.academics.models import AcademicSession, LecturerProfile, StudentEnrollment, SupervisorAssignment
+from apps.academics.services import reassign_supervisor
 from .models import (
-    AssessmentScheme, DeadlineExtension, DefencePanel, ExaminerScore, ProjectCompletion,
+    AssessmentScheme, CompletionEvent, DeadlineExtension, DefencePanel, ExaminerScore, ProjectCompletion,
     ProjectNotification, ProjectReportSection, ProjectReportSubmission, ProjectTopic,
 )
 
@@ -114,6 +115,251 @@ class CompletionWorkflowTests(APITestCase):
         self.action(self.coordinator, "schedule", expected=400, project=str(project.pk), panel=str(panel.pk), defence_at=(timezone.now() + timedelta(days=1)).isoformat(), venue="Hall")
         project.refresh_from_db()
         self.assertIsNone(project.panel_id)
+
+    def test_former_supervisor_cannot_be_allocated_as_an_examiner(self):
+        replacement = self.user("replacement-supervisor", RoleCode.LECTURER)
+        replacement_profile = LecturerProfile.objects.create(user=replacement)
+        reassign_supervisor(
+            assignment_id=self.assignment.pk,
+            lecturer_id=replacement_profile.pk,
+            actor=self.coordinator,
+            reason="Workload redistribution.",
+        )
+        project = ProjectCompletion.objects.create(enrollment=self.enrollment, status="cleared")
+        self.action(replacement, "save_scheme", components=self.components)
+        self.action(
+            self.coordinator,
+            "create_panel",
+            name="Former supervisor conflict",
+            members=[str(self.supervisor_profile.pk), str(self.profile_one.pk)],
+        )
+        panel = DefencePanel.objects.get(name="Former supervisor conflict")
+        self.action(
+            self.coordinator,
+            "schedule",
+            expected=400,
+            project=str(project.pk),
+            panel=str(panel.pk),
+            defence_at=(timezone.now() + timedelta(days=1)).isoformat(),
+            venue="Room 1",
+        )
+        project.refresh_from_db()
+        self.assertIsNone(project.panel_id)
+
+    def test_coordinator_who_examined_project_cannot_approve_result(self):
+        coordinator_examiner = self.user("coordinator-examiner", RoleCode.PROJECT_COORDINATOR)
+        UserRole.objects.create(
+            user=coordinator_examiner,
+            role=Role.objects.get(code=RoleCode.LECTURER),
+        )
+        coordinator_examiner_profile = LecturerProfile.objects.create(user=coordinator_examiner)
+        project = ProjectCompletion.objects.create(enrollment=self.enrollment, status="cleared")
+        self.action(self.supervisor, "save_scheme", components=self.components)
+        self.action(
+            self.coordinator,
+            "create_panel",
+            name="Coordinator examiner panel",
+            members=[str(coordinator_examiner_profile.pk), str(self.profile_two.pk)],
+        )
+        panel = DefencePanel.objects.get(name="Coordinator examiner panel")
+        self.action(
+            self.coordinator,
+            "schedule",
+            project=str(project.pk),
+            panel=str(panel.pk),
+            defence_at=(timezone.now() + timedelta(days=1)).isoformat(),
+            venue="Room 2",
+        )
+        ProjectCompletion.objects.filter(pk=project.pk).update(
+            defence_at=timezone.now() - timedelta(minutes=1)
+        )
+        self.action(coordinator_examiner, "score", project=str(project.pk), marks=[50, 30])
+        self.action(self.examiner_two, "score", project=str(project.pk), marks=[40, 20])
+        self.action(
+            coordinator_examiner,
+            "approve_result",
+            expected=403,
+            project=str(project.pk),
+        )
+        coordinator_project = self.workspace(coordinator_examiner)["projects"][0]
+        self.assertNotIn("approve_result", coordinator_project["actions"])
+        self.action(
+            coordinator_examiner,
+            "return_result",
+            expected=403,
+            project=str(project.pk),
+            note="Examiner cannot return own result.",
+        )
+        self.action(self.coordinator, "approve_result", project=str(project.pk))
+        self.action(
+            coordinator_examiner,
+            "publish",
+            expected=403,
+            project=str(project.pk),
+        )
+        self.action(self.coordinator, "publish", project=str(project.pk))
+        self.action(
+            self.student,
+            "appeal",
+            project=str(project.pk),
+            complaint="Please review the published assessment.",
+        )
+        appeal = project.appeals.get()
+        self.action(
+            coordinator_examiner,
+            "review_appeal",
+            project=str(project.pk),
+            appeal=str(appeal.pk),
+            note="Panel has reviewed the appeal.",
+        )
+        self.action(
+            coordinator_examiner,
+            "accept_appeal",
+            expected=403,
+            project=str(project.pk),
+            appeal=str(appeal.pk),
+            note="Examiner cannot decide own appeal.",
+        )
+        self.action(
+            self.coordinator,
+            "accept_appeal",
+            project=str(project.pk),
+            appeal=str(appeal.pk),
+            note="Independent Coordinator decision.",
+        )
+
+    def test_former_supervisor_cannot_score_an_existing_conflicted_panel(self):
+        replacement = self.user("replacement-supervisor-score", RoleCode.LECTURER)
+        replacement_profile = LecturerProfile.objects.create(user=replacement)
+        reassign_supervisor(
+            assignment_id=self.assignment.pk,
+            lecturer_id=replacement_profile.pk,
+            actor=self.coordinator,
+            reason="Supervisor reassignment.",
+        )
+        panel = DefencePanel.objects.create(
+            session=self.session,
+            name="Legacy conflicted panel",
+            created_by=self.coordinator,
+        )
+        panel.members.set([self.supervisor_profile, self.profile_one])
+        project = ProjectCompletion.objects.create(
+            enrollment=self.enrollment,
+            status="scheduled",
+            panel=panel,
+            defence_at=timezone.now() - timedelta(minutes=1),
+            components=self.components,
+        )
+        self.action(
+            self.supervisor,
+            "score",
+            expected=403,
+            project=str(project.pk),
+            marks=[50, 30],
+        )
+        self.assertEqual(self.workspace(self.supervisor)["projects"], [])
+
+    def test_coordinator_can_reallocate_panel_without_deleting_previous_score_round(self):
+        project = ProjectCompletion.objects.create(
+            enrollment=self.enrollment,
+            status="panel_reallocation_required",
+            score_round=2,
+        )
+        ExaminerScore.objects.create(
+            project=project,
+            examiner=self.profile_one,
+            round=1,
+            marks=["50.00", "30.00"],
+        )
+        self.action(self.supervisor, "save_scheme", components=self.components)
+        self.action(
+            self.coordinator,
+            "create_panel",
+            name="Replacement panel",
+            members=[str(self.profile_one.pk), str(self.profile_two.pk)],
+        )
+        panel = DefencePanel.objects.get(name="Replacement panel")
+        coordinator_project = self.workspace(self.coordinator)["projects"][0]
+        self.assertIn("schedule", coordinator_project["actions"])
+        student_project = self.workspace(self.student)["projects"][0]
+        self.assertEqual(student_project["status"], "panel_reallocation_required")
+        self.assertEqual(student_project["published_result"], {})
+        self.action(
+            self.coordinator,
+            "schedule",
+            project=str(project.pk),
+            panel=str(panel.pk),
+            defence_at=(timezone.now() + timedelta(days=1)).isoformat(),
+            venue="Replacement venue",
+        )
+        project.refresh_from_db()
+        self.assertEqual(project.status, "scheduled")
+        self.assertEqual(project.score_round, 2)
+        self.assertEqual(project.scores.count(), 1)
+        ProjectCompletion.objects.filter(pk=project.pk).update(
+            defence_at=timezone.now() - timedelta(minutes=1)
+        )
+        self.action(self.examiner_one, "score", project=str(project.pk), marks=[55, 35])
+        self.assertEqual(project.scores.filter(round=2).count(), 1)
+
+    def test_panel_reallocation_can_finish_in_a_closed_session(self):
+        project = ProjectCompletion.objects.create(
+            enrollment=self.enrollment,
+            status="panel_reallocation_required",
+            score_round=2,
+        )
+        CompletionEvent.objects.create(
+            project=project,
+            actor=self.coordinator,
+            action="panel_reallocation_required",
+            note="A replacement panel is required.",
+        )
+        self.assignment.is_current = False
+        self.assignment.ended_at = timezone.now()
+        self.assignment.ended_by = self.coordinator
+        self.assignment.save(update_fields=["is_current", "ended_at", "ended_by"])
+        AcademicSession.objects.filter(pk=self.session.pk).update(status="closed")
+        replacement_supervisor = self.user(
+            "closed-session-replacement-supervisor",
+            RoleCode.LECTURER,
+        )
+        replacement_profile = LecturerProfile.objects.create(
+            user=replacement_supervisor,
+            staff_number="CLOSED-REASSIGN-001",
+        )
+        from apps.academics.services import assign_supervisor
+
+        assign_supervisor(
+            enrollment_id=self.enrollment.pk,
+            lecturer_id=replacement_profile.pk,
+            actor=self.coordinator,
+        )
+        self.action(replacement_supervisor, "save_scheme", components=self.components)
+        self.action(
+            self.coordinator,
+            "create_panel",
+            name="Closed-session replacement panel",
+            members=[str(self.profile_one.pk), str(self.profile_two.pk)],
+        )
+        panel = DefencePanel.objects.get(name="Closed-session replacement panel")
+        self.action(
+            self.coordinator,
+            "schedule",
+            project=str(project.pk),
+            panel=str(panel.pk),
+            defence_at=(timezone.now() + timedelta(days=1)).isoformat(),
+            venue="Closed-session venue",
+        )
+        ProjectCompletion.objects.filter(pk=project.pk).update(
+            defence_at=timezone.now() - timedelta(minutes=1)
+        )
+        self.action(self.examiner_one, "score", project=str(project.pk), marks=[50, 30])
+        self.action(self.examiner_two, "score", project=str(project.pk), marks=[40, 20])
+        self.action(self.coordinator, "approve_result", project=str(project.pk))
+        self.action(self.coordinator, "publish", project=str(project.pk))
+        project.refresh_from_db()
+        self.assertEqual(project.status, "published")
+        self.assertIsNotNone(project.published_at)
 
     def test_scores_publication_corrections_and_appeal(self):
         project = self.allocate()

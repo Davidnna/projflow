@@ -1,6 +1,12 @@
+from importlib import import_module
+
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, connection, transaction
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -48,6 +54,77 @@ class UserModelTests(TestCase):
         self.assertTrue(user.has_role(RoleCode.PROJECT_COORDINATOR))
         self.assertEqual(user.role_assignments.count(), 2)
 
+    def test_student_and_lecturer_roles_are_mutually_exclusive(self):
+        student = User.objects.create_user(
+            email="student-role@example.com",
+            password="Strong-test-password-123",
+        )
+        UserRole.objects.create(
+            user=student,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        with self.assertRaises(DjangoValidationError):
+            UserRole.objects.create(
+                user=student,
+                role=Role.objects.get(code=RoleCode.LECTURER),
+            )
+
+        lecturer = User.objects.create_user(
+            email="lecturer-role@example.com",
+            password="Strong-test-password-123",
+        )
+        UserRole.objects.create(
+            user=lecturer,
+            role=Role.objects.get(code=RoleCode.LECTURER),
+        )
+        with self.assertRaises(DjangoValidationError):
+            UserRole.objects.create(
+                user=lecturer,
+                role=Role.objects.get(code=RoleCode.STUDENT),
+            )
+
+    def test_database_rejects_bulk_assignment_of_incompatible_roles(self):
+        user = User.objects.create_user(
+            email="bulk-role@example.com",
+            password="Strong-test-password-123",
+        )
+        UserRole.objects.create(
+            user=user,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        lecturer_role = Role.objects.get(code=RoleCode.LECTURER)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                UserRole.objects.bulk_create([
+                    UserRole(user=user, role=lecturer_role),
+                ])
+        self.assertFalse(user.has_role(RoleCode.LECTURER))
+
+    def test_database_rejects_queryset_update_into_incompatible_roles(self):
+        student = User.objects.create_user(
+            email="student-update@example.com",
+            password="Strong-test-password-123",
+        )
+        lecturer = User.objects.create_user(
+            email="lecturer-update@example.com",
+            password="Strong-test-password-123",
+        )
+        student_assignment = UserRole.objects.create(
+            user=student,
+            role=Role.objects.get(code=RoleCode.STUDENT),
+        )
+        lecturer_assignment = UserRole.objects.create(
+            user=lecturer,
+            role=Role.objects.get(code=RoleCode.LECTURER),
+        )
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                UserRole.objects.filter(pk=lecturer_assignment.pk).update(
+                    user_id=student.pk,
+                )
+        self.assertTrue(student_assignment.user.has_role(RoleCode.STUDENT))
+        self.assertFalse(student.has_role(RoleCode.LECTURER))
+
     def test_superuser_receives_administrator_role(self):
         user = User.objects.create_superuser(
             email="admin@example.com",
@@ -56,6 +133,157 @@ class UserModelTests(TestCase):
         self.assertTrue(user.is_staff)
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.has_role(RoleCode.ADMINISTRATOR))
+
+
+class RoleIntegrityMigrationTests(TransactionTestCase):
+    reset_sequences = True
+
+    def test_conflicting_legacy_accounts_are_disabled_without_deleting_student_history(self):
+        migration = import_module(
+            "apps.accounts.migrations.0003_enforce_student_lecturer_exclusivity"
+        )
+        with connection.schema_editor() as editor:
+            migration.remove_role_triggers(django_apps, editor)
+
+        try:
+            student_role = Role.objects.get(code=RoleCode.STUDENT)
+            lecturer_role = Role.objects.get(code=RoleCode.LECTURER)
+            student_with_both_roles = User.objects.create_user(
+                email="legacy-dual-role@example.com",
+                password="Strong-test-password-123",
+            )
+            enrollment_only_student = User.objects.create_user(
+                email="legacy-enrollment-only@example.com",
+                password="Strong-test-password-123",
+            )
+            coordinator = User.objects.create_user(
+                email="legacy-migration-actor@example.com",
+                password="Strong-test-password-123",
+            )
+            coordinator_role = Role.objects.get(code=RoleCode.PROJECT_COORDINATOR)
+            UserRole.objects.bulk_create([
+                UserRole(user=student_with_both_roles, role=student_role),
+                UserRole(user=student_with_both_roles, role=lecturer_role),
+                UserRole(user=enrollment_only_student, role=lecturer_role),
+                UserRole(user=coordinator, role=coordinator_role),
+            ])
+
+            from apps.academics.models import (
+                AcademicSession,
+                LecturerProfile,
+                StudentEnrollment,
+                SupervisorAssignment,
+            )
+            from apps.projects.models import (
+                CompletionEvent,
+                DefencePanel,
+                ExaminerScore,
+                ProjectCompletion,
+                ProjectNotification,
+            )
+
+            session = AcademicSession.objects.create(name="Legacy role migration session")
+            enrollments = StudentEnrollment.objects.bulk_create([
+                StudentEnrollment(
+                    user=student_with_both_roles,
+                    session=session,
+                    matric_number="LEGACY/001",
+                ),
+                StudentEnrollment(
+                    user=enrollment_only_student,
+                    session=session,
+                    matric_number="LEGACY/002",
+                ),
+            ])
+            profiles = LecturerProfile.objects.bulk_create([
+                LecturerProfile(user=student_with_both_roles, staff_number="LEGACY-001"),
+                LecturerProfile(user=enrollment_only_student, staff_number="LEGACY-002"),
+            ])
+            valid_examiner = User.objects.create_user(
+                email="legacy-valid-examiner@example.com",
+                password="Strong-test-password-123",
+            )
+            valid_examiner_profile = LecturerProfile.objects.create(user=valid_examiner)
+            UserRole.objects.create(
+                user=valid_examiner,
+                role=lecturer_role,
+            )
+            assignments = [
+                SupervisorAssignment.objects.create(
+                    student_enrollment=enrollment,
+                    lecturer=profile,
+                    assigned_by=coordinator,
+                )
+                for enrollment, profile in zip(enrollments, profiles)
+            ]
+            panel = DefencePanel.objects.create(
+                session=session,
+                name="Legacy dual-role panel",
+                created_by=coordinator,
+            )
+            panel.members.set([profiles[0], valid_examiner_profile])
+            published_at = timezone.now()
+            project = ProjectCompletion.objects.create(
+                enrollment=enrollments[0],
+                status="published",
+                panel=panel,
+                defence_at=published_at,
+                venue="Legacy hall",
+                components=[{"name": "Report", "maximum": 60}, {"name": "Defence", "maximum": 40}],
+                score_round=1,
+                published_result={"overall": "80.00"},
+                published_at=published_at,
+            )
+            ExaminerScore.objects.create(
+                project=project,
+                examiner=profiles[0],
+                round=1,
+                marks=["50.00", "30.00"],
+            )
+            ExaminerScore.objects.create(
+                project=project,
+                examiner=valid_examiner_profile,
+                round=1,
+                marks=["55.00", "35.00"],
+            )
+
+            with connection.schema_editor() as editor:
+                migration.clean_conflicting_accounts(django_apps, editor)
+
+            student_with_both_roles.refresh_from_db()
+            enrollment_only_student.refresh_from_db()
+            self.assertTrue(student_with_both_roles.has_role(RoleCode.STUDENT))
+            self.assertFalse(student_with_both_roles.has_role(RoleCode.LECTURER))
+            self.assertTrue(enrollment_only_student.has_role(RoleCode.STUDENT))
+            self.assertFalse(enrollment_only_student.has_role(RoleCode.LECTURER))
+            self.assertEqual(StudentEnrollment.objects.filter(pk__in=[e.pk for e in enrollments]).count(), 2)
+            self.assertEqual(LecturerProfile.objects.filter(pk__in=[p.pk for p in profiles]).count(), 2)
+            self.assertFalse(LecturerProfile.objects.filter(pk__in=[p.pk for p in profiles], is_active=True).exists())
+            self.assertEqual(SupervisorAssignment.objects.filter(pk__in=[a.pk for a in assignments]).count(), 2)
+            for assignment in assignments:
+                assignment.refresh_from_db()
+                self.assertFalse(assignment.is_current)
+                self.assertIsNotNone(assignment.ended_at)
+                self.assertIn("role-integrity migration", assignment.reassignment_reason)
+            project.refresh_from_db()
+            self.assertEqual(project.status, "panel_reallocation_required")
+            self.assertIsNone(project.panel_id)
+            self.assertEqual(project.score_round, 2)
+            self.assertEqual(project.published_result, {})
+            self.assertIsNone(project.published_at)
+            self.assertEqual(project.scores.count(), 2)
+            self.assertEqual(project.scores.values_list("round", flat=True).distinct().get(), 1)
+            self.assertEqual(panel.members.count(), 1)
+            event = CompletionEvent.objects.get(project=project, action="panel_reallocation_required")
+            self.assertEqual(event.data["previous_published_result"], {"overall": "80.00"})
+            self.assertEqual(event.data["previous_panel_id"], str(panel.pk))
+            self.assertTrue(ProjectNotification.objects.filter(recipient=student_with_both_roles, category="defence").exists())
+            self.assertTrue(ProjectNotification.objects.filter(recipient=coordinator, category="defence").exists())
+            self.assertTrue(ProjectNotification.objects.filter(recipient=student_with_both_roles, category="supervision").exists())
+            self.assertTrue(ProjectNotification.objects.filter(recipient=coordinator, category="supervision").exists())
+        finally:
+            with connection.schema_editor() as editor:
+                migration.install_role_triggers(django_apps, editor)
 
 
 class InitialAdministratorSetupTests(APITestCase):

@@ -244,7 +244,11 @@ class LecturerProfileViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().exclude(
+            user__role_assignments__role__code=RoleCode.STUDENT
+        ).exclude(
+            user__student_enrollments__isnull=False
+        )
         if is_coordinator_or_administrator(user):
             return queryset
         if user.has_role(RoleCode.LECTURER):
@@ -330,6 +334,8 @@ class LecturerWorkloadView(APIView):
     def get(self, request):
         lecturers = (
             LecturerProfile.objects.filter(is_active=True, user__is_active=True)
+            .exclude(user__role_assignments__role__code=RoleCode.STUDENT)
+            .exclude(user__student_enrollments__isnull=False)
             .select_related("user")
             .annotate(
                 active_supervisee_count=Count(
