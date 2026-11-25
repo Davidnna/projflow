@@ -421,6 +421,7 @@ def perform_action(user, data, uploaded_file=None):
     """Use one session row lock for state transitions and allocation consistency."""
     check(isinstance(data, Mapping), "Provide a valid request object.")
     operation = text(data, "action", 40)
+    is_coordinator = coordinator(user)
     uploaded_paths = []
     try:
         with transaction.atomic():
@@ -453,7 +454,7 @@ def perform_action(user, data, uploaded_file=None):
                     and (
                         (
                             operation in ("create_panel", "update_panel")
-                            and coord
+                            and is_coordinator
                             and reallocation_projects.exclude(
                                 scores__round=F("score_round")
                             ).exists()

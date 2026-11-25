@@ -302,6 +302,31 @@ class CompletionWorkflowTests(APITestCase):
         self.action(self.examiner_one, "score", project=str(project.pk), marks=[55, 35])
         self.assertEqual(project.scores.filter(round=2).count(), 1)
 
+    def test_closed_session_panel_reallocation_setup_remains_coordinator_only(self):
+        project = ProjectCompletion.objects.create(
+            enrollment=self.enrollment,
+            status="panel_reallocation_required",
+            score_round=2,
+        )
+        CompletionEvent.objects.create(
+            project=project,
+            actor=self.coordinator,
+            action="panel_reallocation_required",
+            note="A replacement panel is required.",
+        )
+        AcademicSession.objects.filter(pk=self.session.pk).update(status="closed")
+
+        self.action(
+            self.supervisor,
+            "create_panel",
+            expected=400,
+            name="Unauthorised replacement panel",
+            members=[str(self.profile_one.pk), str(self.profile_two.pk)],
+        )
+        self.assertFalse(
+            DefencePanel.objects.filter(name="Unauthorised replacement panel").exists()
+        )
+
     def test_panel_reallocation_can_finish_in_a_closed_session(self):
         project = ProjectCompletion.objects.create(
             enrollment=self.enrollment,

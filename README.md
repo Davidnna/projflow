@@ -4,7 +4,7 @@
 
 ProjFlow is a web-based final-year project management system for one academic department. It is designed to coordinate student onboarding, academic sessions, supervisor allocation, project-topic approval, supervision, submissions, progress monitoring, final defence, assessment and result publication.
 
-- **Current release:** `1.0.1-rc.1` (role-integrity and deployment-hardening candidate)
+- **Current release:** `1.0.1-rc.2` (role-integrity and deployment-hardening candidate)
 - **Project type:** Single-department academic management platform
 - **Architecture:** Modular monolith
 - **Repository:** <https://github.com/Davidnna/projflow>
@@ -808,3 +808,9 @@ Montserrat is used for brand wordmarks and major brand headings. Inter is used f
 ## 13. Licence
 
 No open-source licence has been selected. Until a licence is added, no permission to reuse or redistribute the software should be assumed.
+
+### Release 1.0.1-rc.2 (closed-session panel reallocation correction)
+
+- Fixes a Coordinator permission-variable scope error in the closed-session recovery gate. The permission is now evaluated in `perform_action()` before the action dispatcher runs.
+- Retains the existing restriction that only Coordinators may create or update examination panels during the narrowly scoped closed-session recovery process.
+- Adds a regression test proving that a non-Coordinator cannot create a replacement panel in a closed academic session. The existing full recovery test continues to cover replacement supervisor assessment-scheme setup, panel creation, scheduling, scoring, approval and publication.
